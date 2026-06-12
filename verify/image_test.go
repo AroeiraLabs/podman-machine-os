@@ -260,14 +260,11 @@ var _ = Describe("run image tests", Ordered, ContinueOnFailure, func() {
 			Expect(sshSession.outputToString()).
 				To(Equal("ostree-unverified-registry:quay.io/podman/machine-os:" + imageVersion))
 
-			// TODO: there is no 5.5 in the copr yet as podman main would need to be bumped.
-			// But in order to do that it needs working machine images, catch-22.
-			// Skip this check for now, we should consider only doing this check on release branches.
 			// check the server version so we know we have the right version installed in the VM
-			// server, err := mb.setCmd([]string{"version", "--format", "{{.Server.Version}}"}).run()
-			// Expect(err).ToNot(HaveOccurred())
-			// Expect(server).To(Exit(0))
-			// Expect(server.outputToString()).To(Equal(version))
+			server, err := mb.setCmd([]string{"version", "--format", "{{.Server.Version}}"}).run()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(server).To(Exit(0))
+			Expect(server.outputToString()).To(Equal(version))
 		})
 	})
 })
