@@ -87,9 +87,13 @@ else
     shopt -s nullglob
     FILE="/var/tmp/rpms/*.rpm"
     if [[ -n $(echo $FILE) ]]; then dnf update -y --best --allowerasing $FILE; fi
+
+    # Temporary get the dependency packages from podman-next so we can get working deps for containers-common and netavark for 6.0.
+    curl --fail -o /etc/yum.repos.d/rhcontainerbot-podman-next-fedora.repo https://copr.fedorainfracloud.org/coprs/rhcontainerbot/podman-next/repo/fedora-rawhide/rhcontainerbot-podman-next-fedora-rawhide.repo
+    curl --fail -o /etc/pki/rpm-gpg/rhcontainerbot-podman-next-fedora.gpg https://download.copr.fedorainfracloud.org/results/rhcontainerbot/podman-next/pubkey.gpg
     curl --fail -o /etc/yum.repos.d/podman-release-copr.repo https://copr.fedorainfracloud.org/coprs/packit/podman-container-tools-podman-${PODMAN_PR_NUM}/repo/fedora-rawhide/packit-podman-container-tools-podman-${PODMAN_PR_NUM}-fedora-rawhide.repo
     curl --fail -o /etc/pki/rpm-gpg/podman-release-copr.gpg https://download.copr.fedorainfracloud.org/results/packit/podman-container-tools-podman-${PODMAN_PR_NUM}/pubkey.gpg
-    dnf install --best -y podman
+    dnf install --from-repo=copr:copr.fedorainfracloud.org:packit:podman-container-tools-podman-${PODMAN_PR_NUM} --best -y podman
 fi
 
 # Install subscription-manager and enable service to refresh certificates
