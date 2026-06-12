@@ -62,8 +62,6 @@ mkdir -p "$OUTDIR"
     podman build --output type=tar,dest="$tarfile" \
     -f podman-image/Containerfile.WSL "${PWD}"/podman-image \
     --build-arg PODMAN_PR_NUM="${PODMAN_PR_NUM}" \
-    --build-arg NETAVARK_PR_NUM="${NETAVARK_PR_NUM}" \
-    --build-arg AARDVARK_DNS_PR_NUM="${AARDVARK_DNS_PR_NUM}" \
     --build-arg FEDORA_VERSION="${FEDORA_VERSION:1}"
 
     $ZSTD_CMD $tarfile
@@ -79,9 +77,7 @@ trap "kill %1 || true; echo; echo 'WSL build log:'; cat $WSL_LOG" EXIT
 podman build -t "${FULL_IMAGE_NAME_ARCH}" -v "$PWD"/rpms:/var/tmp/rpms \
     -f podman-image/Containerfile.COREOS "${PWD}"/podman-image \
     --build-arg FCOS_BASE_IMAGE="${FCOS_BASE_IMAGE}" \
-    --build-arg PODMAN_PR_NUM="${PODMAN_PR_NUM}" \
-    --build-arg NETAVARK_PR_NUM="${NETAVARK_PR_NUM}" \
-    --build-arg AARDVARK_DNS_PR_NUM="${AARDVARK_DNS_PR_NUM}"
+    --build-arg PODMAN_PR_NUM="${PODMAN_PR_NUM}"
 
 # Use rpm-ostree rechunk to remove unwanted data/packages and save space where can
 echo "Re-Chunking to make incremental upgrades more efficient"
