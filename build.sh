@@ -10,7 +10,7 @@ echo " Building image locally"
 
 # Validate PODMAN_PR_NUM var, see the Containerfile for the pull logic.
 case "${PODMAN_PR_NUM}" in
-  '') echo "Will install podman from the podman-next copr, the podman version is ignored" ;;
+  '') echo "Will install podman from the f44-podman6 copr, the podman version is ignored" ;;
   [0-9]*) ;;
   *) echo 'PODMAN_PR_NUM must be empty or set to a valid PR number' 1>&2; exit 1;;
 esac

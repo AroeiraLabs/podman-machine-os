@@ -79,8 +79,8 @@ EOF
 # release agnostic and such `rawhide` URLs are unlikely to change compared to URLs
 # containing Fedora release numbers.
 if [[ ${PODMAN_PR_NUM} == "" ]]; then \
-    curl --fail -o /etc/yum.repos.d/rhcontainerbot-podman-next-fedora.repo https://copr.fedorainfracloud.org/coprs/rhcontainerbot/podman-next/repo/fedora-rawhide/rhcontainerbot-podman-next-fedora-rawhide.repo
-    curl --fail -o /etc/pki/rpm-gpg/rhcontainerbot-podman-next-fedora.gpg https://download.copr.fedorainfracloud.org/results/rhcontainerbot/podman-next/pubkey.gpg
+    curl --fail -o /etc/yum.repos.d/rhcontainerbot-f44-podman6-fedora.repo https://copr.fedorainfracloud.org/coprs/rhcontainerbot/f44-podman6/repo/fedora-44/rhcontainerbot-f44-podman6-fedora-44.repo
+    curl --fail -o /etc/pki/rpm-gpg/rhcontainerbot-f44-podman6-fedora.gpg https://download.copr.fedorainfracloud.org/results/rhcontainerbot/f44-podman6/pubkey.gpg
     dnf install --best -y \
     aardvark-dns crun netavark podman containers-common containers-common-extra crun-wasm
 else
@@ -88,9 +88,9 @@ else
     FILE="/var/tmp/rpms/*.rpm"
     if [[ -n $(echo $FILE) ]]; then dnf update -y --best --allowerasing $FILE; fi
 
-    # Temporary get the dependency packages from podman-next so we can get working deps for containers-common and netavark for 6.0.
-    curl --fail -o /etc/yum.repos.d/rhcontainerbot-podman-next-fedora.repo https://copr.fedorainfracloud.org/coprs/rhcontainerbot/podman-next/repo/fedora-rawhide/rhcontainerbot-podman-next-fedora-rawhide.repo
-    curl --fail -o /etc/pki/rpm-gpg/rhcontainerbot-podman-next-fedora.gpg https://download.copr.fedorainfracloud.org/results/rhcontainerbot/podman-next/pubkey.gpg
+    # Temporary get the dependency packages from f44-podman6 so we can get working deps for containers-common and netavark for 6.0.
+    curl --fail -o /etc/yum.repos.d/rhcontainerbot-f44-podman6-fedora.repo https://copr.fedorainfracloud.org/coprs/rhcontainerbot/f44-podman6/repo/fedora-44/rhcontainerbot-f44-podman6-fedora-44.repo
+    curl --fail -o /etc/pki/rpm-gpg/rhcontainerbot-f44-podman6-fedora.gpg https://download.copr.fedorainfracloud.org/results/rhcontainerbot/f44-podman6/pubkey.gpg
     curl --fail -o /etc/yum.repos.d/podman-release-copr.repo https://copr.fedorainfracloud.org/coprs/packit/podman-container-tools-podman-${PODMAN_PR_NUM}/repo/fedora-rawhide/packit-podman-container-tools-podman-${PODMAN_PR_NUM}-fedora-rawhide.repo
     curl --fail -o /etc/pki/rpm-gpg/podman-release-copr.gpg https://download.copr.fedorainfracloud.org/results/packit/podman-container-tools-podman-${PODMAN_PR_NUM}/pubkey.gpg
     dnf install --from-repo=copr:copr.fedorainfracloud.org:packit:podman-container-tools-podman-${PODMAN_PR_NUM} --best -y podman
