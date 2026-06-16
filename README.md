@@ -32,7 +32,7 @@ Some environment variables are set in `podman-rpm-info-vars.sh`:
 - `PODMAN_VERION`: used for the image tag (only the x.y, the patch version is
   ignored)
 - `PODMAN_PR_NUM`: used to add a podman version from a PR. The default is empty
-  (and rpms will be fetched from the `rhcontainerbot/podman-next` copr)
+  (and rpms will be fetched from the `rhcontainerbot/f44-podman6` copr)
 
 ## Running the tests
 
