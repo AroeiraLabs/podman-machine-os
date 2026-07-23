@@ -87,17 +87,14 @@ else
     shopt -s nullglob
     FILE="/var/tmp/rpms/*.rpm"
     if [[ -n $(echo $FILE) ]]; then dnf update -y --best --allowerasing $FILE; fi
+
+    # Temporary get the dependency packages from f44-podman6 so we can get working deps for containers-common and netavark for 6.0.
+    curl --fail -o /etc/yum.repos.d/rhcontainerbot-f44-podman6-fedora.repo https://copr.fedorainfracloud.org/coprs/rhcontainerbot/f44-podman6/repo/fedora-44/rhcontainerbot-f44-podman6-fedora-44.repo
+    curl --fail -o /etc/pki/rpm-gpg/rhcontainerbot-f44-podman6-fedora.gpg https://download.copr.fedorainfracloud.org/results/rhcontainerbot/f44-podman6/pubkey.gpg
     curl --fail -o /etc/yum.repos.d/podman-release-copr.repo https://copr.fedorainfracloud.org/coprs/packit/podman-container-tools-podman-${PODMAN_PR_NUM}/repo/fedora-rawhide/packit-podman-container-tools-podman-${PODMAN_PR_NUM}-fedora-rawhide.repo
     curl --fail -o /etc/pki/rpm-gpg/podman-release-copr.gpg https://download.copr.fedorainfracloud.org/results/packit/podman-container-tools-podman-${PODMAN_PR_NUM}/pubkey.gpg
-    dnf install --best -y podman
+    dnf install --from-repo=copr:copr.fedorainfracloud.org:packit:podman-container-tools-podman-${PODMAN_PR_NUM} --best -y podman
 fi
-
-curl --fail -o /etc/yum.repos.d/netavark-release-copr.repo https://copr.fedorainfracloud.org/coprs/packit/containers-netavark-${NETAVARK_PR_NUM}/repo/fedora-rawhide/packit-containers-netavark-${NETAVARK_PR_NUM}-fedora-rawhide.repo
-curl --fail -o /etc/pki/rpm-gpg/netavark-release-copr.gpg https://download.copr.fedorainfracloud.org/results/packit/containers-netavark-${NETAVARK_PR_NUM}/pubkey.gpg
-curl --fail -o /etc/yum.repos.d/aardvark-dns-release-copr.repo https://copr.fedorainfracloud.org/coprs/packit/containers-aardvark-dns-${AARDVARK_DNS_PR_NUM}/repo/fedora-rawhide/packit-containers-aardvark-dns-${AARDVARK_DNS_PR_NUM}-fedora-rawhide.repo
-curl --fail -o /etc/pki/rpm-gpg/aardvark-dns-release-copr.gpg https://download.copr.fedorainfracloud.org/results/packit/containers-aardvark-dns-${AARDVARK_DNS_PR_NUM}/pubkey.gpg
-
-dnf install --best -y netavark aardvark-dns
 
 # Install subscription-manager and enable service to refresh certificates
 # Install qemu-user-static for bootc/user emulation
