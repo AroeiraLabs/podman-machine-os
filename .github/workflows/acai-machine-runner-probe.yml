@@ -1,0 +1,36 @@
+name: Acai P4-3A runner probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Immutable-input preflight (no build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout approved public source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Stop on mutable build inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "b22d4e68cd75fea5ad476c9a6ca13b76f51288ea"
+          test "$(git -C custom-coreos-disk-images rev-parse HEAD)" = "12f696dfec3b4f7fe3c8748433aa2627c0f97367"
+          test -f SOURCE-OFFER.md
+          test -f THIRD_PARTY_NOTICES.md
+
+          echo "Checking for build inputs that are not pinned by digest or snapshot."
+          grep -nF 'fedora:latest' .github/workflows/build.yml
+          grep -nF 'fedora-coreos:$FCOS_STREAM' util.sh
+          grep -nF 'quay.io/fedora/fedora:${FEDORA_VERSION}' podman-image/Containerfile.WSL
+
+          echo "::error title=Acai P4-3A stopped::Mutable Fedora and DNF/Koji inputs remain. No build, artifact, registry login, attestation, or publication was attempted."
+          exit 42
