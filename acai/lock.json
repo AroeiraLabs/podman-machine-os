@@ -136,13 +136,39 @@
   "toolchain_packages": [
     "git", "curl", "podman", "buildah", "zstd", "osbuild", "osbuild-tools",
     "osbuild-ostree", "rpm-ostree", "xfsprogs", "e2fsprogs", "jq", "dosfstools",
-    "util-linux-core"
+    "util-linux-core", "gh"
   ],
   "actions": [
     {
       "uses": "actions/checkout",
       "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1",
       "version_hint": "v7.0.1"
+    },
+    {
+      "uses": "actions/attest-build-provenance",
+      "sha": "977bb373ede98d70efdf65b84cb5f73e068dcc2a",
+      "version_hint": "v3 (tag anotada deref conferida em 2026-07-29)"
+    },
+    {
+      "uses": "actions/attest-sbom",
+      "sha": "c604332985a26aa8cf1bdc465b92731239ec6b9e",
+      "version_hint": "v4.1.0"
+    }
+  ],
+  "tools": [
+    {
+      "name": "syft",
+      "version": "1.44.0",
+      "url": "https://github.com/anchore/syft/releases/download/v1.44.0/syft_1.44.0_linux_arm64.tar.gz",
+      "sha256": "6f6cdcdc695721d91ce756e3b5bc3e3416599c464101f5e32e9c3f33054ee6d9",
+      "note": "conferido contra syft_1.44.0_checksums.txt oficial em 2026-07-29"
+    },
+    {
+      "name": "grype",
+      "version": "0.116.1",
+      "url": "https://github.com/anchore/grype/releases/download/v0.116.1/grype_0.116.1_linux_arm64.tar.gz",
+      "sha256": "a8d7504a149629324eb5f4ce3dc25dfd211bbfe047e64ee2bf7844b466c3d84d",
+      "note": "conferido contra grype_0.116.1_checksums.txt oficial em 2026-07-29; o banco de vulnerabilidades e baixado em runtime (dado de scan, nao input de build — mutabilidade aceita)"
     }
   ],
   "allowed_hosts": [

@@ -16,6 +16,10 @@ die() { printf '::error::ACAI P4-3A STOP: %s\n' "$*"; exit 42; }
 note() { printf '::notice::%s\n' "$*"; }
 
 cleanup() {
+  if [ "${ACAI_KEEP_OUT:-0}" = "1" ]; then
+    note "ACAI_KEEP_OUT=1: saída preservada para o passo de publicação do MESMO job"
+    return 0
+  fi
   rm -rf "$OUT" || true
   podman rmi -f "$IMAGE_TAG" >/dev/null 2>&1 || true
   note "cleanup executado (trap): saída e imagem locais destruídas"
@@ -81,4 +85,9 @@ EXTRA=$(find "$OUT" -type f \( -name "*-hyperv*" -o -name "*-qemu*" \) | wc -l |
 note "saída applehv: $(basename "$RAW") | bytes=$(stat -c%s "$RAW") | sha256=$(sha256sum "$RAW" | cut -d' ' -f1)"
 note "manifesto de RPMs da imagem (registro, não autorização):"
 podman run --rm --cgroups=disabled "$IMAGE_TAG" rpm -qa --qf '%{NEVRA}\n' | sort | head -400
-note "build applehv concluído sem publicação — trap destruirá a saída"
+if [ "${ACAI_KEEP_OUT:-0}" = "1" ]; then
+  zstd --rm -T0 -14 "$RAW"
+  note "artefato comprimido para publicação: $(basename "$RAW").zst"
+else
+  note "build applehv concluído sem publicação — trap destruirá a saída"
+fi
