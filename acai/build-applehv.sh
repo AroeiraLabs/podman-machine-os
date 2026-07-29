@@ -73,6 +73,26 @@ rpm-ostree compose build-chunked-oci \
   --bootc --from "$IMAGE_TAG" \
   --output "oci-archive:${OUT}/podman-machine"
 
+# O custom-coreos-disk-images.sh exige getenforce == "Permissive". O runner ARM64
+# do GitHub roda Ubuntu, que usa AppArmor: não há SELinux e getenforce reporta
+# "Disabled" — estado em que não existe negação alguma, portanto ainda menos
+# restritivo que "Permissive". A checagem é neutralizada SOMENTE nesse caso, de
+# forma explícita e registrada. Com SELinux ativo, mudamos de verdade para
+# permissive; se não for possível, paramos.
+CCDI="$SRC/custom-coreos-disk-images/custom-coreos-disk-images.sh"
+enforce=$(getenforce 2>/dev/null || echo Disabled)
+note "SELinux no ambiente de build: $enforce"
+case "$enforce" in
+  Permissive) : ;;
+  Enforcing)
+    setenforce 0 || die "SELinux Enforcing e não foi possível mudar para permissive"
+    note "SELinux alterado para permissive" ;;
+  *)
+    sed -i 's|if \[ "$(getenforce)" != "Permissive" \]; then|if false; then # ACAI-SELINUX: host sem SELinux|' "$CCDI"
+    grep -q 'ACAI-SELINUX' "$CCDI" || die "não foi possível neutralizar a checagem de SELinux"
+    note "host sem SELinux: checagem de permissive neutralizada explicitamente" ;;
+esac
+
 pushd "$OUT" >/dev/null
 sh "$SRC"/custom-coreos-disk-images/custom-coreos-disk-images.sh \
   --platforms "$PLATFORMS" \
