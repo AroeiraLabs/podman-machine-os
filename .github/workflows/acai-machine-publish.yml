@@ -70,9 +70,12 @@ jobs:
             sha=$(jq -r ".tools[] | select(.name==\"$tool\") | .sha256" acai/lock.json)
             curl -fsSL -o "/tmp/$tool.tgz" "$url"
             echo "$sha  /tmp/$tool.tgz" | sha256sum -c -
-            tar -xzf "/tmp/$tool.tgz" -C /usr/local/bin "$tool"
+            # /usr/local/bin não existe na imagem FCOS; /usr/bin existe e está no PATH
+            tar -xzf "/tmp/$tool.tgz" -C /usr/bin "$tool"
+            rm -f "/tmp/$tool.tgz"
           done
           syft version; grype version
+          echo "::notice::disco antes do build:"; df -h /var/tmp /tmp 2>/dev/null | sed -n '1,5p'
 
       - name: Verificação do source-lock (fail-closed)
         shell: bash
@@ -83,6 +86,11 @@ jobs:
         env:
           ACAI_KEEP_OUT: "1"
         run: bash acai/build-applehv.sh
+
+      - name: Disco após o build (diagnóstico)
+        if: always()
+        shell: bash
+        run: df -h /var/tmp /tmp 2>/dev/null | sed -n '1,5p'
 
       - name: SBOM SPDX do artefato final
         shell: bash
