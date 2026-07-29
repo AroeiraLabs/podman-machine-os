@@ -121,16 +121,20 @@
     {
       "id": "copr-packit-pr29249",
       "url": "https://download.copr.fedorainfracloud.org/results/packit/podman-container-tools-podman-29249/pubkey.gpg",
-      "sha256": "d6a4e7fd121ca3ba5de835bc3b87ef5ec955650b3d3f0324c0672da2c1486bc1"
+      "sha256": "d6a4e7fd121ca3ba5de835bc3b87ef5ec955650b3d3f0324c0672da2c1486bc1",
+      "fingerprint": "904c90e559ef35f9eda3126f1956362ee0dab36d",
+      "note": "fingerprint conferida em duas fontes independentes: calculada do arquivo pinado e reportada pelo rpm -Kv no run 30478768568"
     },
     {
       "id": "copr-rhcontainerbot-f44-podman6",
       "url": "https://download.copr.fedorainfracloud.org/results/rhcontainerbot/f44-podman6/pubkey.gpg",
-      "sha256": "d5dc4cca123f4b6e4ddeb9b61c812753232e0e1f549df277b75138ad4b19a80a"
+      "sha256": "d5dc4cca123f4b6e4ddeb9b61c812753232e0e1f549df277b75138ad4b19a80a",
+      "fingerprint": "27fd45b5c3237240b17df89cdefa3e84319b300e",
+      "note": "calculada do arquivo pinado pelo mesmo metodo validado contra a chave packit"
     },
     {
       "id": "fedora-44-embedded",
-      "note": "chave oficial Fedora 44 ja presente na imagem FCOS pinada por digest (/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary)"
+      "note": "chave oficial Fedora 44 presente na imagem FCOS pinada por digest (/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary). Sem pin de fingerprint por nao ser obtida por rede: sua procedencia e o proprio digest da imagem. A fingerprint efetiva e registrada no relatorio do run."
     }
   ],
   "toolchain_packages": [
