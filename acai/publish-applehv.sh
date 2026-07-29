@@ -21,8 +21,9 @@ ZST="$OUT/podman-machine.aarch64.applehv.raw.zst"
 [ -f "$OUT/sbom.spdx.json" ] || die "SBOM ausente — gerar antes do push"
 
 buildah manifest create --annotation "github.runid=${GITHUB_RUN_ID:-local}" "$FULL"
-loaded=$(podman load -i "$OCI_TAR")
+loaded=$(podman load -i "$OCI_TAR" | tail -1)
 img_id="${loaded#Loaded image: }"
+[ -n "$img_id" ] || die "não foi possível identificar a imagem carregada do oci-archive"
 podman tag "$img_id" "$FULL-arm64"
 # Imagem OCI: arch normalizada (arm64). Artefato de disco: arch NÃO normalizada
 # (aarch64) — o podman machine compara literalmente contra "aarch64" ao procurar
