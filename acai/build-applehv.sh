@@ -31,6 +31,8 @@ mkdir -p "$OUT"
 
 PLATFORMS=$(jq -r .target.platforms "$LOCK")
 [ "$PLATFORMS" = "applehv" ] || die "seletor de target diverge do gate: $PLATFORMS"
+CPU_ARCH=$(jq -r .target.cpu_arch "$LOCK")
+[ "$CPU_ARCH" = "aarch64" ] || die "arquitetura do lock diverge: $CPU_ARCH"
 FCOS_DIGEST=$(jq -r .oci.fcos_base.arm64_digest "$LOCK")
 FCOS_REF="$(jq -r .oci.fcos_base.ref "$LOCK")@${FCOS_DIGEST}"
 
@@ -63,23 +65,31 @@ WANT=$(jq -r '.rpms[] | select(.name=="podman") | .nevra' "$LOCK" | sed -E 's/^p
 note "podman na imagem: $GOT"
 
 # ---------- rechunk + imagem de disco (somente applehv) ----------
+# Nomenclatura idêntica à do upstream (util.sh/build.sh): o arquivo do
+# oci-archive é "podman-machine" sem extensão e o disco final precisa se chamar
+# podman-machine.<arch>.<plataforma>.<ext>.zst — o podman machine deriva tipo e
+# compressão das DUAS últimas extensões do título do layer.
 rpm-ostree compose build-chunked-oci \
   --bootc --from "$IMAGE_TAG" \
-  --output "oci-archive:${OUT}/podman-machine.aarch64.oci"
+  --output "oci-archive:${OUT}/podman-machine"
 
 pushd "$OUT" >/dev/null
 sh "$SRC"/custom-coreos-disk-images/custom-coreos-disk-images.sh \
   --platforms "$PLATFORMS" \
-  --ociarchive "${PWD}/podman-machine.aarch64.oci" \
+  --ociarchive "${PWD}/podman-machine" \
   --osname fedora-coreos \
   --imgref "ostree-unverified-registry:${IMAGE_TAG}" \
   --metal-image-size 6144 \
   --extra-kargs='ostree.prepare-root.composefs=0'
+
+produced="podman-machine-${PLATFORMS}.${CPU_ARCH}.raw"
+[ -f "$produced" ] || die "saída esperada não encontrada: $produced (presentes: $(ls | tr '\n' ' '))"
+mv "$produced" "podman-machine.${CPU_ARCH}.${PLATFORMS}.raw"
 popd >/dev/null
 
 # ---------- relatório sanitizado (a destruição fica com o trap) ----------
-RAW=$(find "$OUT" -name "*applehv*" -type f | head -1)
-[ -n "$RAW" ] || die "nenhuma saída applehv produzida"
+RAW="$OUT/podman-machine.${CPU_ARCH}.${PLATFORMS}.raw"
+[ -f "$RAW" ] || die "nenhuma saída applehv produzida"
 EXTRA=$(find "$OUT" -type f \( -name "*-hyperv*" -o -name "*-qemu*" \) | wc -l | tr -d ' ')
 [ "$EXTRA" = "0" ] || die "targets além de applehv foram produzidos"
 note "saída applehv: $(basename "$RAW") | bytes=$(stat -c%s "$RAW") | sha256=$(sha256sum "$RAW" | cut -d' ' -f1)"

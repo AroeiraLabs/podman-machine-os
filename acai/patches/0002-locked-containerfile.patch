@@ -16,3 +16,12 @@
      checkmodule -M -m -o /qemu_guest_agent_vsock.mod /qemu_guest_agent_vsock.te && \
      semodule_package -o /qemu_guest_agent_vsock.pp -m /qemu_guest_agent_vsock.mod
  
+@@ -14,7 +21,7 @@
+ ARG FEDORA_VERSION=${FEDORA_VERSION}
+ 
+ RUN --mount=type=bind,source=/build_common.sh,target=/run/build_common.sh,z \
+-    /run/build_common.sh && ostree container commit
++    /run/build_common.sh && rm -rf /run/* /tmp/* /var/tmp/* /var/cache/*
+ 
+ COPY podman-iptables.conf /etc/modules-load.d/podman-iptables.conf
+ 
