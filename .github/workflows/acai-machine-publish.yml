@@ -92,18 +92,18 @@ jobs:
         shell: bash
         run: df -h /var/tmp /tmp 2>/dev/null | sed -n '1,5p'
 
-      - name: SBOM SPDX do artefato final
+      - name: Conferir SBOM e artefatos produzidos pelo build
         shell: bash
         run: |
           set -euo pipefail
-          # O oci-archive segue a nomenclatura do upstream: arquivo "podman-machine"
-          # sem extensão. Mesmo caminho consumido por acai/publish-applehv.sh.
+          ls -la /var/tmp/acai/out
+          # A SBOM é gerada dentro de acai/build-applehv.sh, no mesmo passo em que
+          # o oci-archive nasce; aqui apenas conferimos o resultado e o limite.
+          test -f /var/tmp/acai/out/sbom.spdx.json
           test -f /var/tmp/acai/out/podman-machine
-          syft "oci-archive:/var/tmp/acai/out/podman-machine" \
-            -o spdx-json=/var/tmp/acai/out/sbom.spdx.json
+          test -f /var/tmp/acai/out/podman-machine.aarch64.applehv.raw.zst
           test "$(stat -c%s /var/tmp/acai/out/sbom.spdx.json)" -le 16777216
           jq -e '.spdxVersion' /var/tmp/acai/out/sbom.spdx.json >/dev/null
-          echo "::notice::pacotes na SBOM: $(jq '[.packages[]?] | length' /var/tmp/acai/out/sbom.spdx.json)"
 
       - name: Scan de vulnerabilidades (limite V1 - zero criticas/altas)
         shell: bash
