@@ -73,6 +73,19 @@ rpm-ostree compose build-chunked-oci \
   --bootc --from "$IMAGE_TAG" \
   --output "oci-archive:${OUT}/podman-machine"
 
+ls -la "$OUT" || true
+[ -f "$OUT/podman-machine" ] || die "oci-archive não é arquivo regular: $(ls -la "$OUT/podman-machine" 2>&1)"
+
+# SBOM gerada AQUI, no mesmo passo em que o artefato nasce. Antes ela era gerada
+# num passo separado do workflow e dependia de o arquivo sobreviver entre passos,
+# suposição que se mostrou frágil. O gate exige SBOM do artefato final antes do
+# push; este é o mesmo objeto que sera publicado.
+if [ "${ACAI_KEEP_OUT:-0}" = "1" ]; then
+  syft "oci-archive:${OUT}/podman-machine" -o spdx-json="$OUT/sbom.spdx.json"
+  jq -e '.spdxVersion' "$OUT/sbom.spdx.json" >/dev/null || die "SBOM inválida"
+  note "SBOM gerada: $(jq '[.packages[]?] | length' "$OUT/sbom.spdx.json") pacotes | sha256=$(sha256sum "$OUT/sbom.spdx.json" | cut -d' ' -f1)"
+fi
+
 # O custom-coreos-disk-images.sh exige getenforce == "Permissive". O runner ARM64
 # do GitHub roda Ubuntu, que usa AppArmor: não há SELinux e getenforce reporta
 # "Disabled" — estado em que não existe negação alguma, portanto ainda menos
