@@ -1,36 +1,75 @@
 name: Acai P4-3A runner probe
 
+# Probe único, manual e fail-closed do build AppleHV/arm64 com source-lock.
+# Gate: AroeiraLabs/acai docs/security/PODMAN-MACHINE-P4-3A-SOURCE-LOCK-GATE.md
+# Runner ubuntu-24.04-arm e dispatch autorizados por Alan Leite (issue #41).
+# Sem secrets, cache, artefato, login, atestação ou publicação.
+
 on:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: acai-p4-3a-probe
+  cancel-in-progress: false
+
 jobs:
-  preflight:
-    name: Immutable-input preflight (no build)
-    runs-on: ubuntu-24.04
+  probe:
+    name: Locked AppleHV/arm64 build (no publication)
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 90
+    container:
+      # quay.io/fedora/fedora:44 pinado por digest de índice (acai/lock.json)
+      image: quay.io/fedora/fedora@sha256:590825dbaee41a97a162ecdffc3305264bd11cb3ff1e9cfd710d41ca5f936134
+      options: --privileged -v /dev:/dev -v /lib/modules:/lib/modules -v /var --tmpfs /run --tmpfs /tmp
     steps:
-      - name: Checkout approved public source
+      - name: Checkout da main aprovada
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          submodules: recursive
 
-      - name: Stop on mutable build inputs
+      - name: Teste estático do lock (fail-closed)
+        shell: bash
+        run: bash acai/test-lock-static.sh
+
+      - name: Toolchain travada no repo GA congelado
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "b22d4e68cd75fea5ad476c9a6ca13b76f51288ea"
-          test "$(git -C custom-coreos-disk-images rev-parse HEAD)" = "12f696dfec3b4f7fe3c8748433aa2627c0f97367"
-          test -f SOURCE-OFFER.md
-          test -f THIRD_PARTY_NOTICES.md
+          test "$(uname -m)" = "aarch64"
+          rm -f /etc/yum.repos.d/*.repo
+          cat > /etc/yum.repos.d/acai-f44-ga-locked.repo <<'ACAIREPO'
+          [acai-f44-ga-locked]
+          name=Fedora 44 GA (locked)
+          baseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/
+          enabled=1
+          gpgcheck=1
+          gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary
+          ACAIREPO
+          curl --fail -sS -o /tmp/acai-repomd.xml https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/repodata/repomd.xml
+          echo "ad124f8125666e9059d7a8180427bdaea80f6286f71140457e5c7edd95883eee  /tmp/acai-repomd.xml" | sha256sum -c -
+          # Lista idêntica a toolchain_packages do acai/lock.json (revisada em PR)
+          dnf install -y git curl podman buildah zstd osbuild osbuild-tools \
+            osbuild-ostree rpm-ostree xfsprogs e2fsprogs jq dosfstools \
+            util-linux-core
 
-          echo "Checking for build inputs that are not pinned by digest or snapshot."
-          grep -nF 'fedora:latest' .github/workflows/build.yml
-          grep -nF 'fedora-coreos:$FCOS_STREAM' util.sh
-          grep -nF 'quay.io/fedora/fedora:${FEDORA_VERSION}' podman-image/Containerfile.WSL
+      - name: Verificação do source-lock (fail-closed)
+        shell: bash
+        run: bash acai/verify-lock.sh
 
-          echo "::error title=Acai P4-3A stopped::Mutable Fedora and DNF/Koji inputs remain. No build, artifact, registry login, attestation, or publication was attempted."
-          exit 42
+      - name: Build travado AppleHV/arm64 (sem publicação)
+        shell: bash
+        run: bash acai/build-applehv.sh
+
+      - name: Relatório sanitizado
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "workflow_sha=${GITHUB_SHA}"
+          echo "runner_arch=$(uname -m) label=ubuntu-24.04-arm"
+          echo "lock_sha256=$(sha256sum acai/lock.json | cut -d' ' -f1)"
+          test ! -e "${XDG_RUNTIME_DIR:-/run/user/0}/containers/auth.json" || { echo "::error::auth.json presente"; exit 42; }
+          echo "sem_login_registry=confirmado sem_artefato=confirmado sem_atestacao=confirmada"
