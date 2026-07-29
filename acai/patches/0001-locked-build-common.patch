@@ -1,0 +1,62 @@
+--- a/podman-image/build_common.sh
++++ b/podman-image/build_common.sh
+@@ -78,29 +78,32 @@
+ # 4. Even though the URLs mention `rawhide`, the repo and gpg files are Fedora
+ # release agnostic and such `rawhide` URLs are unlikely to change compared to URLs
+ # containing Fedora release numbers.
+-if [[ ${PODMAN_PR_NUM} == "" ]]; then \
+-    curl --fail -o /etc/yum.repos.d/rhcontainerbot-f44-podman6-fedora.repo https://copr.fedorainfracloud.org/coprs/rhcontainerbot/f44-podman6/repo/fedora-44/rhcontainerbot-f44-podman6-fedora-44.repo
+-    curl --fail -o /etc/pki/rpm-gpg/rhcontainerbot-f44-podman6-fedora.gpg https://download.copr.fedorainfracloud.org/results/rhcontainerbot/f44-podman6/pubkey.gpg
+-    dnf install --best -y \
+-    aardvark-dns crun netavark podman containers-common containers-common-extra crun-wasm
+-else
+-    shopt -s nullglob
+-    FILE="/var/tmp/rpms/*.rpm"
+-    if [[ -n $(echo $FILE) ]]; then dnf update -y --best --allowerasing $FILE; fi
++# ACAI P4-3A source-lock: sem repositorio dinamico (COPR/Packit); dnf preso ao
++# snapshot GA congelado, verificado NO CACHE que o dnf usa. RPMs de containers
++# chegam pre-verificados (sha256 + assinatura) em /var/tmp/rpms (verify-lock).
++rm -f /etc/yum.repos.d/*.repo
++cat > /etc/yum.repos.d/acai-f44-ga-locked.repo <<'ACAIREPO'
++[acai-f44-ga-locked]
++name=Fedora 44 GA (locked)
++baseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/
++enabled=1
++gpgcheck=1
++gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary
++metadata_expire=never
++ACAIREPO
++dnf makecache --refresh
++ACAI_REPOMD="$(find /var/cache -path '*acai-f44-ga-locked*' -name repomd.xml | head -1)"
++echo "ad124f8125666e9059d7a8180427bdaea80f6286f71140457e5c7edd95883eee  ${ACAI_REPOMD}" | sha256sum -c -
++shopt -s nullglob
++ACAI_RPMS=(/var/tmp/rpms/*.rpm)
++if [[ ${#ACAI_RPMS[@]} -eq 0 ]]; then echo "ACAI STOP: nenhum RPM pre-verificado em /var/tmp/rpms"; exit 42; fi
++dnf install -y --best --allowerasing --disablerepo='*' --enablerepo=acai-f44-ga-locked "${ACAI_RPMS[@]}"
+ 
+-    # Temporary get the dependency packages from f44-podman6 so we can get working deps for containers-common and netavark for 6.0.
+-    curl --fail -o /etc/yum.repos.d/rhcontainerbot-f44-podman6-fedora.repo https://copr.fedorainfracloud.org/coprs/rhcontainerbot/f44-podman6/repo/fedora-44/rhcontainerbot-f44-podman6-fedora-44.repo
+-    curl --fail -o /etc/pki/rpm-gpg/rhcontainerbot-f44-podman6-fedora.gpg https://download.copr.fedorainfracloud.org/results/rhcontainerbot/f44-podman6/pubkey.gpg
+-    curl --fail -o /etc/yum.repos.d/podman-release-copr.repo https://copr.fedorainfracloud.org/coprs/packit/podman-container-tools-podman-${PODMAN_PR_NUM}/repo/fedora-rawhide/packit-podman-container-tools-podman-${PODMAN_PR_NUM}-fedora-rawhide.repo
+-    curl --fail -o /etc/pki/rpm-gpg/podman-release-copr.gpg https://download.copr.fedorainfracloud.org/results/packit/podman-container-tools-podman-${PODMAN_PR_NUM}/pubkey.gpg
+-    dnf install --from-repo=copr:copr.fedorainfracloud.org:packit:podman-container-tools-podman-${PODMAN_PR_NUM} --best -y podman
+-fi
+-
+ # Install subscription-manager and enable service to refresh certificates
+ # Install qemu-user-static for bootc/user emulation
+ # Install device-mapper (this satisfies the deps for qemu-user-static
+ # We don't want all weak deps for these packages here.
+-dnf install -y --setopt=install_weak_deps=false \
++dnf install -y --disablerepo='*' --enablerepo=acai-f44-ga-locked --setopt=install_weak_deps=false \
+     subscription-manager device-mapper qemu-user-static-aarch64 qemu-user-static-x86
+ 
+ # Set a custom variant to mark this image as our own for both fedora countme
+@@ -135,7 +138,7 @@
+     qemu-guest-agent
+ )
+ 
+-dnf install -y "${PACKAGES[@]}"
++dnf install -y --disablerepo='*' --enablerepo=acai-f44-ga-locked "${PACKAGES[@]}"
+ 
+ # Remove unwanted packages (mainly relevant for coreos)
+ dnf remove -y moby-engine containerd runc toolbox qed-firmware docker-cli

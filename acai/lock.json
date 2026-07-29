@@ -1,0 +1,160 @@
+{
+  "name": "acai-p4-3a-source-lock",
+  "schema": 2,
+  "date_collected": "2026-07-29",
+  "gate": "AroeiraLabs/acai docs/security/PODMAN-MACHINE-P4-3A-SOURCE-LOCK-GATE.md",
+  "evidence": "AroeiraLabs/acai issue #41 (inventario verificado) + parecer do Codex no PR podman-machine-os#2 (correcoes P1/P2 aplicadas)",
+  "target": {
+    "platforms": "applehv",
+    "cpu_arch": "aarch64",
+    "fedora_version": "44"
+  },
+  "source": {
+    "repo": "AroeiraLabs/podman-machine-os",
+    "upstream_repo_id": 774381571,
+    "commit": "80b13071a9695a84ccbc311e33785b31209102f4",
+    "tag_hint": "v6.0.2",
+    "base_branch": "acai/v6.0.2-base",
+    "submodules": [
+      {
+        "path": "custom-coreos-disk-images",
+        "url": "https://github.com/coreos/custom-coreos-disk-images",
+        "upstream_repo_id": 761458964,
+        "gitlink": "e017ddda3b20b09627f90f68ef1b708016d10864",
+        "license": "GPL-3.0 (texto GPL v3 na revisao fixada)"
+      }
+    ],
+    "patches": [
+      {
+        "file": "acai/patches/0001-locked-build-common.patch",
+        "applies_to": "podman-image/build_common.sh",
+        "sha256": "08fc9e4cc072a392ec433ec32edcf4b90218a6beea7975e539181c25d312ce09",
+        "purpose": "remove COPR/koji dinamicos; instala somente RPMs pre-verificados locais; prende TODO dnf ao snapshot GA com repomd verificado no cache do dnf (makecache + sha256 + --disablerepo)"
+      },
+      {
+        "file": "acai/patches/0002-locked-containerfile.patch",
+        "applies_to": "podman-image/Containerfile.COREOS",
+        "sha256": "5ef8e07e7802ba39cbfcb3c9e357412c9d447c5ac894fd67df39ac5f0757af03",
+        "purpose": "prende o dnf da primeira stage (checkpolicy/policycoreutils) ao mesmo snapshot GA verificado"
+      }
+    ]
+  },
+  "oci": {
+    "build_container": {
+      "ref": "quay.io/fedora/fedora-coreos",
+      "tag_hint": "44.20260707.3.1 (mesma imagem FCOS pinada; container de toolchain do job)",
+      "index_digest": "sha256:ffa252a63eaa2a80ca6c22f7a48e616b6f3c6576fd2e0d87446ad316f9c93f14",
+      "arm64_digest": "sha256:4273f06f799e1a114c57ed42eaa8295cc586f1c5860256b1b89c3b3c7cf5b1a6",
+      "platform": "linux/arm64",
+      "note": "Evidencia PR #2: digests do canal quay.io/fedora/fedora:44 NAO sao duraveis (retag diario + GC — digest de 28/07 retornou 404 em 29/07). Os digests FCOS sao retidos pela tag de versao. Por isso a toolchain usa a MESMA imagem FCOS pinada do build."
+    },
+    "fcos_base": {
+      "ref": "quay.io/fedora/fedora-coreos",
+      "tag_hint": "stable = 44.20260707.3.1 (streams 2026-07-21)",
+      "index_digest": "sha256:ffa252a63eaa2a80ca6c22f7a48e616b6f3c6576fd2e0d87446ad316f9c93f14",
+      "arm64_digest": "sha256:4273f06f799e1a114c57ed42eaa8295cc586f1c5860256b1b89c3b3c7cf5b1a6",
+      "platform": "linux/arm64"
+    }
+  },
+  "dnf": {
+    "repo_id": "acai-f44-ga-locked",
+    "baseurl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/",
+    "repomd_sha256": "ad124f8125666e9059d7a8180427bdaea80f6286f71140457e5c7edd95883eee",
+    "revision": "1776864863",
+    "gpgcheck": true,
+    "gpgkey": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary",
+    "binding": "Todos os pontos de dnf (toolchain do job, build_common.sh e primeira stage do Containerfile) removem os .repo preexistentes, criam somente este repo com metadata_expire=never, rodam dnf makecache e conferem o sha256 do repomd.xml NO CACHE que o dnf consome; toda instalacao usa --disablerepo='*' --enablerepo=acai-f44-ga-locked. Snapshot imutavel na acepcao do gate: repo GA congelado + repomd pinado + gpgcheck; pacotes resolvidos sao registrados no relatorio (rpm -qa).",
+    "note": "O repo updates/44 e mutavel e NAO e habilitado; pacotes de updates entram como rpms diretos com sha256 abaixo."
+  },
+  "rpms": [
+    {
+      "name": "podman",
+      "nevra": "podman-5:6.0.2-1.20260721201440138206.pr29249.16.b28edb9ad7.fc44.aarch64",
+      "url": "https://download.copr.fedorainfracloud.org/results/packit/podman-container-tools-podman-29249/fedora-44-aarch64/Packages/p/podman-6.0.2-1.20260721201440138206.pr29249.16.b28edb9ad7.fc44.aarch64.rpm",
+      "sha256": "b755f86df03b6c7ac77b54c83e35443747295f6ee361c03cfe4624a933a2cfe6",
+      "gpg_key": "copr-packit-pr29249"
+    },
+    {
+      "name": "aardvark-dns",
+      "nevra": "aardvark-dns-102:2.0.0-1.fc44.aarch64",
+      "url": "https://download.copr.fedorainfracloud.org/results/rhcontainerbot/f44-podman6/fedora-44-aarch64/Packages/a/aardvark-dns-2.0.0-1.fc44.aarch64.rpm",
+      "sha256": "5b9f5ee37e43b3bc62dd512013373a45451179e15b2989f94912c3ded113952b",
+      "gpg_key": "copr-rhcontainerbot-f44-podman6"
+    },
+    {
+      "name": "netavark",
+      "nevra": "netavark-102:2.0.0-2.fc44.aarch64",
+      "url": "https://download.copr.fedorainfracloud.org/results/rhcontainerbot/f44-podman6/fedora-44-aarch64/Packages/n/netavark-2.0.0-2.fc44.aarch64.rpm",
+      "sha256": "b07156c5d0b666b208c93c4be5a15add837958cece03ca09d16eb655af098fa2",
+      "gpg_key": "copr-rhcontainerbot-f44-podman6"
+    },
+    {
+      "name": "containers-common",
+      "nevra": "containers-common-102:0.68.1-1.fc44.noarch",
+      "url": "https://download.copr.fedorainfracloud.org/results/rhcontainerbot/f44-podman6/fedora-44-aarch64/Packages/c/containers-common-0.68.1-1.fc44.noarch.rpm",
+      "sha256": "e2b5b05b11cc82352d476a261a57389da31fc85754595784e1e5a71ce981cc57",
+      "gpg_key": "copr-rhcontainerbot-f44-podman6"
+    },
+    {
+      "name": "containers-common-extra",
+      "nevra": "containers-common-extra-102:0.68.1-1.fc44.noarch",
+      "url": "https://download.copr.fedorainfracloud.org/results/rhcontainerbot/f44-podman6/fedora-44-aarch64/Packages/c/containers-common-extra-0.68.1-1.fc44.noarch.rpm",
+      "sha256": "d8b0ea94d83b0ab4c425f5d6a027da3c2bcda3f2d33ed58d44e481053fd268df",
+      "gpg_key": "copr-rhcontainerbot-f44-podman6"
+    },
+    {
+      "name": "crun",
+      "nevra": "crun-0:1.28-1.fc44.aarch64",
+      "url": "https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/aarch64/Packages/c/crun-1.28-1.fc44.aarch64.rpm",
+      "sha256": "768c500f785025217e45990386e3c99958491915d3b2e88b3ab363b418e2c588",
+      "gpg_key": "fedora-44-embedded"
+    },
+    {
+      "name": "container-selinux",
+      "nevra": "container-selinux-2.250.0-1.fc44.noarch",
+      "url": "https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/aarch64/Packages/c/container-selinux-2.250.0-1.fc44.noarch.rpm",
+      "sha256": "0c1cc8359c77e8cc0d0f22053b10f962e260f93dbf88a2013270d32e7f7da0d4",
+      "gpg_key": "fedora-44-embedded"
+    }
+  ],
+  "gpg_keys": [
+    {
+      "id": "copr-packit-pr29249",
+      "url": "https://download.copr.fedorainfracloud.org/results/packit/podman-container-tools-podman-29249/pubkey.gpg",
+      "sha256": "d6a4e7fd121ca3ba5de835bc3b87ef5ec955650b3d3f0324c0672da2c1486bc1"
+    },
+    {
+      "id": "copr-rhcontainerbot-f44-podman6",
+      "url": "https://download.copr.fedorainfracloud.org/results/rhcontainerbot/f44-podman6/pubkey.gpg",
+      "sha256": "d5dc4cca123f4b6e4ddeb9b61c812753232e0e1f549df277b75138ad4b19a80a"
+    },
+    {
+      "id": "fedora-44-embedded",
+      "note": "chave oficial Fedora 44 ja presente na imagem FCOS pinada por digest (/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary)"
+    }
+  ],
+  "toolchain_packages": [
+    "git", "curl", "podman", "buildah", "zstd", "osbuild", "osbuild-tools",
+    "osbuild-ostree", "rpm-ostree", "xfsprogs", "e2fsprogs", "jq", "dosfstools",
+    "util-linux-core"
+  ],
+  "actions": [
+    {
+      "uses": "actions/checkout",
+      "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "version_hint": "v7.0.1"
+    }
+  ],
+  "allowed_hosts": [
+    "dl.fedoraproject.org",
+    "download.copr.fedorainfracloud.org",
+    "quay.io",
+    "github.com"
+  ],
+  "removed_upstream_steps": {
+    "koji_latestfrom": "eliminado (tags moveis; substituido por crun/container-selinux pinados acima)",
+    "copr_repo_fetch_dinamico": "eliminado pelo patch 0001 (rpms locais pre-verificados)",
+    "wsl_build": "fora de escopo (target somente applehv)",
+    "fedora_version_runtime": "eliminado (fixado em 44, consistente com FCOS 44.20260707.3.1)"
+  }
+}
