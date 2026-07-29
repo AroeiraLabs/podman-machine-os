@@ -34,8 +34,8 @@
       {
         "file": "acai/patches/0002-locked-containerfile.patch",
         "applies_to": "podman-image/Containerfile.COREOS",
-        "sha256": "5ef8e07e7802ba39cbfcb3c9e357412c9d447c5ac894fd67df39ac5f0757af03",
-        "purpose": "prende o dnf da primeira stage (checkpolicy/policycoreutils) ao mesmo snapshot GA verificado"
+        "sha256": "a28a5e9d81ea75cf63f40373ac44fefce287c4fa270a58f783daabb26abe14a6",
+        "purpose": "prende o dnf da primeira stage ao mesmo snapshot GA verificado e substitui 'ostree container commit' pela limpeza equivalente. O verbo 'container' e uma extensao externa do ostree (/usr/libexec/libostree/ext/ostree-container, fornecida pelo pacote bootc no Fedora 42+) ausente nesta arvore de build; hoje o comando apenas esvazia /run /tmp /var/tmp /var/cache (bootc, crates/ostree-ext/src/commit.rs, FORCE_CLEAN_PATHS) e o proprio upstream o documentou como nao recomendado"
       }
     ]
   },
