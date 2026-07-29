@@ -110,8 +110,13 @@ popd >/dev/null
 # ---------- relatório sanitizado (a destruição fica com o trap) ----------
 RAW="$OUT/podman-machine.${CPU_ARCH}.${PLATFORMS}.raw"
 [ -f "$RAW" ] || die "nenhuma saída applehv produzida"
-EXTRA=$(find "$OUT" -type f \( -name "*-hyperv*" -o -name "*-qemu*" \) | wc -l | tr -d ' ')
-[ "$EXTRA" = "0" ] || die "targets além de applehv foram produzidos"
+# Guarda de escopo: só interessam os artefatos de disco no nível de saída.
+# Buscar recursivamente pegava sobras temporárias do osbuild, que não são
+# entregáveis. A mensagem lista os arquivos para o desvio ser diagnosticável.
+EXTRA=$(find "$OUT" -maxdepth 1 -type f -name 'podman-machine*' \
+          \( -name '*hyperv*' -o -name '*qemu*' \) -exec basename {} \; 2>/dev/null | tr '\n' ' ')
+[ -z "$EXTRA" ] || die "targets além de applehv no diretório de saída: $EXTRA"
+note "conteúdo do diretório de saída: $(ls "$OUT" | tr '\n' ' ')"
 note "saída applehv: $(basename "$RAW") | bytes=$(stat -c%s "$RAW") | sha256=$(sha256sum "$RAW" | cut -d' ' -f1)"
 note "manifesto de RPMs da imagem (registro, não autorização):"
 podman run --rm --cgroups=disabled "$IMAGE_TAG" rpm -qa --qf '%{NEVRA}\n' | sort | head -400
