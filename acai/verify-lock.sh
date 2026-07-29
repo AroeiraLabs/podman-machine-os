@@ -79,10 +79,18 @@ check_oci() {
 check_oci build_container
 check_oci fcos_base
 
+# Downloads pinados: seguir redirect é necessário (o COPR responde 301 para o
+# seu storage Pulp/S3) e é seguro porque a integridade não vem da origem e sim
+# do SHA-256 do lock e, nos RPMs, também da assinatura conferida por rpm -Kv.
+# https obrigatório e no máximo 3 saltos; a URL efetiva é registrada.
+fetch_pinned() {
+  curl -fsSL --proto '=https' --max-redirs 3 -o "$1" -w '%{url_effective}' "$2"
+}
+
 # ---------- 5. Chaves GPG pinadas ----------
 while IFS=$'\t' read -r kid kurl ksha; do
   [ "$kurl" = "null" ] && continue
-  curl -fsS -o "$KEYS/$kid.gpg" "$kurl" || die "download da chave falhou: $kid"
+  fetch_pinned "$KEYS/$kid.gpg" "$kurl" >/dev/null || die "download da chave falhou: $kid"
   echo "$ksha  $KEYS/$kid.gpg" | sha256sum -c - >/dev/null 2>&1 || die "sha256 da chave difere do lock: $kid"
   rpm --import "$KEYS/$kid.gpg" || die "import da chave falhou: $kid"
   note "chave importada: $kid"
@@ -91,10 +99,14 @@ done < <(jq -r '.gpg_keys[] | [.id, (.url // "null"), (.sha256 // "")] | @tsv' "
 # ---------- 6. RPMs pinados: download + sha256 + assinatura ----------
 while IFS=$'\t' read -r name url sha; do
   f="$RPMS/$(basename "$url")"
-  curl -fsS -o "$f" "$url" || die "download do RPM falhou: $name"
+  eff=$(fetch_pinned "$f" "$url") || die "download do RPM falhou: $name"
+  case "$eff" in "$url") : ;; *) note "redirect seguido ($name): origem declarada -> storage do provedor" ;; esac
   echo "$sha  $f" | sha256sum -c - >/dev/null 2>&1 || die "sha256 difere do lock: $name"
-  sigout=$(rpm -Kv "$f") || die "rpm -Kv falhou: $name"
-  echo "$sigout" | grep -qE 'Signature, key ID .*: OK' || die "assinatura ausente/inválida: $name"
+  # Autoridade é o código de saída do rpm (falha em NOKEY/assinatura inválida);
+  # o padrão é frouxo de propósito porque o texto de rpm -Kv varia por versão.
+  sigout=$(rpm -Kv "$f" 2>&1) || die "assinatura inválida ou chave ausente: $name — $(echo "$sigout" | tail -3 | tr '\n' ' ')"
+  echo "$sigout" | grep -qiE 'signature[^:]*:[[:space:]]*OK' \
+    || die "sem linha de assinatura OK: $name — $(echo "$sigout" | tail -3 | tr '\n' ' ')"
   note "rpm ok: $name"
 done < <(jq -r '.rpms[] | [.name, .url, .sha256] | @tsv' "$LOCK")
 
