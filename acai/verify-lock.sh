@@ -103,11 +103,24 @@ while IFS=$'\t' read -r name url sha; do
   case "$eff" in "$url") : ;; *) note "redirect seguido ($name): origem declarada -> storage do provedor" ;; esac
   echo "$sha  $f" | sha256sum -c - >/dev/null 2>&1 || die "sha256 difere do lock: $name"
   # Autoridade é o código de saída do rpm (falha em NOKEY/assinatura inválida);
-  # o padrão é frouxo de propósito porque o texto de rpm -Kv varia por versão.
+  # o padrão do texto é frouxo porque a redação de rpm -Kv varia por versão.
   sigout=$(rpm -Kv "$f" 2>&1) || die "assinatura inválida ou chave ausente: $name — $(echo "$sigout" | tail -3 | tr '\n' ' ')"
-  echo "$sigout" | grep -qiE 'signature[^:]*:[[:space:]]*OK' \
+  echo "$sigout" | grep -qiE 'signature.*OK' \
     || die "sem linha de assinatura OK: $name — $(echo "$sigout" | tail -3 | tr '\n' ' ')"
-  note "rpm ok: $name"
+  # Fingerprint efetiva da chave que assinou este RPM.
+  # Aceita "key fingerprint: <40 hex>" (rpm atual) e "key ID <8+ hex>" (legado).
+  got_fp=$(echo "$sigout" | grep -oiE 'key (fingerprint|ID)[:,]? *[0-9a-f]{8,40}' | grep -oiE '[0-9a-f]{8,40}' | tail -1 | tr 'A-F' 'a-f')
+  keyid=$(jq -r --arg n "$name" '.rpms[] | select(.name==$n) | .gpg_key' "$LOCK")
+  want_fp=$(jq -r --arg k "$keyid" '.gpg_keys[] | select(.id==$k) | (.fingerprint // "")' "$LOCK" | tr 'A-F' 'a-f')
+  [ -n "$got_fp" ] || die "não foi possível extrair fingerprint/key ID de $name — $(echo "$sigout" | tail -3 | tr '\n' ' ')"
+  if [ -n "$want_fp" ]; then
+    # Sufixo cobre os dois formatos: a fingerprint pinada termina no key ID curto.
+    case "$want_fp" in *"$got_fp") : ;; *) die "chave difere do lock em $name: efetiva=$got_fp esperada=$want_fp" ;; esac
+    note "rpm ok: $name (assinado pela chave pinada ${want_fp:0:16}…)"
+  else
+    # Chave sem pin de rede: procede da imagem FCOS pinada por digest.
+    note "rpm ok: $name (chave da imagem pinada; fingerprint efetiva=$got_fp)"
+  fi
 done < <(jq -r '.rpms[] | [.name, .url, .sha256] | @tsv' "$LOCK")
 
 note "verify-lock: TODOS os inputs conferem com o lock"
