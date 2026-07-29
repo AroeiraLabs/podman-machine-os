@@ -96,10 +96,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          syft "oci-archive:/var/tmp/acai/out/podman-machine.aarch64.oci" \
+          # O oci-archive segue a nomenclatura do upstream: arquivo "podman-machine"
+          # sem extensão. Mesmo caminho consumido por acai/publish-applehv.sh.
+          test -f /var/tmp/acai/out/podman-machine
+          syft "oci-archive:/var/tmp/acai/out/podman-machine" \
             -o spdx-json=/var/tmp/acai/out/sbom.spdx.json
           test "$(stat -c%s /var/tmp/acai/out/sbom.spdx.json)" -le 16777216
           jq -e '.spdxVersion' /var/tmp/acai/out/sbom.spdx.json >/dev/null
+          echo "::notice::pacotes na SBOM: $(jq '[.packages[]?] | length' /var/tmp/acai/out/sbom.spdx.json)"
 
       - name: Scan de vulnerabilidades (limite V1 - zero criticas/altas)
         shell: bash
