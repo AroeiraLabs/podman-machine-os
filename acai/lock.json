@@ -34,8 +34,8 @@
       {
         "file": "acai/patches/0002-locked-containerfile.patch",
         "applies_to": "podman-image/Containerfile.COREOS",
-        "sha256": "a28a5e9d81ea75cf63f40373ac44fefce287c4fa270a58f783daabb26abe14a6",
-        "purpose": "prende o dnf da primeira stage ao mesmo snapshot GA verificado e substitui 'ostree container commit' pela limpeza equivalente. O verbo 'container' e uma extensao externa do ostree (/usr/libexec/libostree/ext/ostree-container, fornecida pelo pacote bootc no Fedora 42+) ausente nesta arvore de build; hoje o comando apenas esvazia /run /tmp /var/tmp /var/cache (bootc, crates/ostree-ext/src/commit.rs, FORCE_CLEAN_PATHS) e o proprio upstream o documentou como nao recomendado"
+        "sha256": "2154cc69726390696bd55609638b04b732748c21526328154aedd729a45f7149",
+        "purpose": "prende o dnf da primeira stage ao mesmo snapshot GA verificado e REMOVE a chamada 'ostree container commit'. O verbo 'container' e extensao externa do ostree (/usr/libexec/libostree/ext/ostree-container, do pacote bootc no Fedora 42+), ausente nesta arvore; hoje so esvazia /run /tmp /var/tmp /var/cache e o upstream o documentou como nao recomendado. Nao ha substituto porque o build_common.sh ja faz 'dnf clean all' e 'rm -fr /var/cache', e /run e /tmp sao tmpfs em runtime; uma limpeza explicita falha nos bind mounts do proprio build (EBUSY em /run/build_common.sh e /var/tmp/rpms)"
       }
     ]
   },
@@ -138,9 +138,21 @@
     }
   ],
   "toolchain_packages": [
-    "git", "curl", "podman", "buildah", "zstd", "osbuild", "osbuild-tools",
-    "osbuild-ostree", "rpm-ostree", "xfsprogs", "e2fsprogs", "jq", "dosfstools",
-    "util-linux-core", "gh"
+    "git",
+    "curl",
+    "podman",
+    "buildah",
+    "zstd",
+    "osbuild",
+    "osbuild-tools",
+    "osbuild-ostree",
+    "rpm-ostree",
+    "xfsprogs",
+    "e2fsprogs",
+    "jq",
+    "dosfstools",
+    "util-linux-core",
+    "gh"
   ],
   "actions": [
     {
