@@ -81,9 +81,19 @@ ls -la "$OUT" || true
 # suposição que se mostrou frágil. O gate exige SBOM do artefato final antes do
 # push; este é o mesmo objeto que sera publicado.
 if [ "${ACAI_KEEP_OUT:-0}" = "1" ]; then
-  syft "oci-archive:${OUT}/podman-machine" -o spdx-json="$OUT/sbom.spdx.json"
+  # Enumeração POR COMPONENTE, que é o que o gate exige. O catálogo de arquivos
+  # individuais fica de fora: ele respondia por quase toda a massa da SBOM
+  # (16,93 MiB, acima do teto de 16 MiB do gate) e não é requisito de nenhum
+  # controle — a correspondência com o artefato é feita por digest, e a
+  # correspondência por pacote, pelo próprio rpm -qa registrado abaixo.
+  SYFT_FILE_METADATA_SELECTION=none \
+    syft "oci-archive:${OUT}/podman-machine" -o spdx-json="$OUT/sbom.spdx.json"
   jq -e '.spdxVersion' "$OUT/sbom.spdx.json" >/dev/null || die "SBOM inválida"
-  note "SBOM gerada: $(jq '[.packages[]?] | length' "$OUT/sbom.spdx.json") pacotes | sha256=$(sha256sum "$OUT/sbom.spdx.json" | cut -d' ' -f1)"
+  pkgs=$(jq '[.packages[]?] | length' "$OUT/sbom.spdx.json")
+  bytes=$(stat -c%s "$OUT/sbom.spdx.json")
+  note "SBOM: $pkgs pacotes | $bytes bytes | sha256=$(sha256sum "$OUT/sbom.spdx.json" | cut -d' ' -f1)"
+  [ "$bytes" -le 16777216 ] || die "SBOM acima do teto de 16 MiB do gate: $bytes bytes"
+  [ "$pkgs" -ge 400 ] || die "SBOM com pacotes de menos ($pkgs) — enumeração por componente incompleta"
 fi
 
 # O custom-coreos-disk-images.sh exige getenforce == "Permissive". O runner ARM64
