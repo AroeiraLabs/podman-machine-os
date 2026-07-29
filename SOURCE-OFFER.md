@@ -30,13 +30,23 @@ the locked revisions.
 
 ## Locked binary inputs
 
-Every RPM, container image, and GPG key consumed by the probe build is
-enumerated in `acai/lock.json` with immutable identity (digest for OCI, SHA-256
-for files) and verified fail-closed by `acai/verify-lock.sh` before any
-install. DNF operations are restricted to the frozen Fedora 44 GA repository
-(fixed host, `repomd.xml` SHA-256 pinned, gpgcheck enabled). The mutable
-`updates` repository is not enabled; individual packages taken from it are
-pinned by URL + SHA-256 in the lock.
+Binary inputs are locked at two levels, both recorded in `acai/lock.json` and
+verified fail-closed before any install:
+
+1. **Directly enumerated objects** — the container-stack RPMs, GPG keys, OCI
+   images (index digest, arm64 child digest, and their index-membership
+   relation) and patches (SHA-256 each), verified by `acai/verify-lock.sh`.
+2. **Frozen repository snapshot** — every remaining DNF resolution (job
+   toolchain, `build_common.sh`, and the Containerfile first stage) is bound to
+   the frozen Fedora 44 GA repository only: fixed host, `repomd.xml` SHA-256
+   verified in the cache DNF actually consumes (after `dnf makecache`),
+   `metadata_expire=never`, gpgcheck enabled, and
+   `--disablerepo='*' --enablerepo=acai-f44-ga-locked` on every install. The
+   resolved package set is deterministic for a fixed repomd and is recorded in
+   the sanitized run report (`rpm -qa`).
+
+The mutable `updates` repository is never enabled; individual packages taken
+from it are pinned by URL + SHA-256 in the lock.
 
 ## Required record before any P4-3B publication
 

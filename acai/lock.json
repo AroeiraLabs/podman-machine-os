@@ -1,9 +1,9 @@
 {
   "name": "acai-p4-3a-source-lock",
-  "schema": 1,
-  "date_collected": "2026-07-28",
+  "schema": 2,
+  "date_collected": "2026-07-29",
   "gate": "AroeiraLabs/acai docs/security/PODMAN-MACHINE-P4-3A-SOURCE-LOCK-GATE.md",
-  "evidence": "AroeiraLabs/acai issue #41 (inventario verificado, digests conferidos contra sha256 local)",
+  "evidence": "AroeiraLabs/acai issue #41 (inventario verificado) + parecer do Codex no PR podman-machine-os#2 (correcoes P1/P2 aplicadas)",
   "target": {
     "platforms": "applehv",
     "cpu_arch": "aarch64",
@@ -28,17 +28,25 @@
       {
         "file": "acai/patches/0001-locked-build-common.patch",
         "applies_to": "podman-image/build_common.sh",
-        "purpose": "remove COPR/koji dinamicos; instala somente RPMs pre-verificados locais; trava dnf no repo GA congelado com repomd conferido"
+        "sha256": "08fc9e4cc072a392ec433ec32edcf4b90218a6beea7975e539181c25d312ce09",
+        "purpose": "remove COPR/koji dinamicos; instala somente RPMs pre-verificados locais; prende TODO dnf ao snapshot GA com repomd verificado no cache do dnf (makecache + sha256 + --disablerepo)"
+      },
+      {
+        "file": "acai/patches/0002-locked-containerfile.patch",
+        "applies_to": "podman-image/Containerfile.COREOS",
+        "sha256": "5ef8e07e7802ba39cbfcb3c9e357412c9d447c5ac894fd67df39ac5f0757af03",
+        "purpose": "prende o dnf da primeira stage (checkpolicy/policycoreutils) ao mesmo snapshot GA verificado"
       }
     ]
   },
   "oci": {
     "build_container": {
-      "ref": "quay.io/fedora/fedora",
-      "tag_hint": "44",
-      "index_digest": "sha256:590825dbaee41a97a162ecdffc3305264bd11cb3ff1e9cfd710d41ca5f936134",
-      "arm64_digest": "sha256:ffe227022b502caaff332d02a9c7852cc38937716d83c4065d895ea1daf8588c",
-      "platform": "linux/arm64"
+      "ref": "quay.io/fedora/fedora-coreos",
+      "tag_hint": "44.20260707.3.1 (mesma imagem FCOS pinada; container de toolchain do job)",
+      "index_digest": "sha256:ffa252a63eaa2a80ca6c22f7a48e616b6f3c6576fd2e0d87446ad316f9c93f14",
+      "arm64_digest": "sha256:4273f06f799e1a114c57ed42eaa8295cc586f1c5860256b1b89c3b3c7cf5b1a6",
+      "platform": "linux/arm64",
+      "note": "Evidencia PR #2: digests do canal quay.io/fedora/fedora:44 NAO sao duraveis (retag diario + GC — digest de 28/07 retornou 404 em 29/07). Os digests FCOS sao retidos pela tag de versao. Por isso a toolchain usa a MESMA imagem FCOS pinada do build."
     },
     "fcos_base": {
       "ref": "quay.io/fedora/fedora-coreos",
@@ -55,7 +63,8 @@
     "revision": "1776864863",
     "gpgcheck": true,
     "gpgkey": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary",
-    "note": "Repo GA congelado (imutavel na pratica), host fixo, sem metalink/mirror. O repo updates/44 e mutavel e NAO e habilitado; pacotes de updates entram como rpms diretos com sha256 abaixo."
+    "binding": "Todos os pontos de dnf (toolchain do job, build_common.sh e primeira stage do Containerfile) removem os .repo preexistentes, criam somente este repo com metadata_expire=never, rodam dnf makecache e conferem o sha256 do repomd.xml NO CACHE que o dnf consome; toda instalacao usa --disablerepo='*' --enablerepo=acai-f44-ga-locked. Snapshot imutavel na acepcao do gate: repo GA congelado + repomd pinado + gpgcheck; pacotes resolvidos sao registrados no relatorio (rpm -qa).",
+    "note": "O repo updates/44 e mutavel e NAO e habilitado; pacotes de updates entram como rpms diretos com sha256 abaixo."
   },
   "rpms": [
     {
@@ -121,7 +130,7 @@
     },
     {
       "id": "fedora-44-embedded",
-      "note": "chave oficial Fedora 44 ja presente na imagem de build pinada por digest (/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary)"
+      "note": "chave oficial Fedora 44 ja presente na imagem FCOS pinada por digest (/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary)"
     }
   ],
   "toolchain_packages": [

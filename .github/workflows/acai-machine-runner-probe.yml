@@ -21,8 +21,10 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 90
     container:
-      # quay.io/fedora/fedora:44 pinado por digest de índice (acai/lock.json)
-      image: quay.io/fedora/fedora@sha256:590825dbaee41a97a162ecdffc3305264bd11cb3ff1e9cfd710d41ca5f936134
+      # Mesma imagem FCOS pinada do build (filho linux/arm64 do lock).
+      # Digests do canal quay.io/fedora/fedora:44 provaram-se não-duráveis
+      # (retag diário + GC) — evidência no parecer do PR #2.
+      image: quay.io/fedora/fedora-coreos@sha256:4273f06f799e1a114c57ed42eaa8295cc586f1c5860256b1b89c3b3c7cf5b1a6
       options: --privileged -v /dev:/dev -v /lib/modules:/lib/modules -v /var --tmpfs /run --tmpfs /tmp
     steps:
       - name: Checkout da main aprovada
@@ -34,7 +36,7 @@ jobs:
         shell: bash
         run: bash acai/test-lock-static.sh
 
-      - name: Toolchain travada no repo GA congelado
+      - name: Toolchain presa ao snapshot GA verificado
         shell: bash
         run: |
           set -euo pipefail
@@ -47,13 +49,18 @@ jobs:
           enabled=1
           gpgcheck=1
           gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary
+          metadata_expire=never
           ACAIREPO
-          curl --fail -sS -o /tmp/acai-repomd.xml https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/repodata/repomd.xml
-          echo "ad124f8125666e9059d7a8180427bdaea80f6286f71140457e5c7edd95883eee  /tmp/acai-repomd.xml" | sha256sum -c -
+          dnf makecache --refresh
+          ACAI_REPOMD="$(find /var/cache -path '*acai-f44-ga-locked*' -name repomd.xml | head -1)"
+          echo "ad124f8125666e9059d7a8180427bdaea80f6286f71140457e5c7edd95883eee  ${ACAI_REPOMD}" | sha256sum -c -
+          test "$(dnf repolist --enabled | grep -c acai-f44-ga-locked)" -ge 1
           # Lista idêntica a toolchain_packages do acai/lock.json (revisada em PR)
-          dnf install -y git curl podman buildah zstd osbuild osbuild-tools \
+          dnf install -y --disablerepo='*' --enablerepo=acai-f44-ga-locked \
+            git curl podman buildah zstd osbuild osbuild-tools \
             osbuild-ostree rpm-ostree xfsprogs e2fsprogs jq dosfstools \
             util-linux-core
+          echo "::notice::toolchain instalada do snapshot verificado; manifesto no relatório final"
 
       - name: Verificação do source-lock (fail-closed)
         shell: bash
@@ -63,13 +70,19 @@ jobs:
         shell: bash
         run: bash acai/build-applehv.sh
 
-      - name: Relatório sanitizado
+      - name: Relatório sanitizado e limpeza incondicional
         if: always()
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           echo "workflow_sha=${GITHUB_SHA}"
           echo "runner_arch=$(uname -m) label=ubuntu-24.04-arm"
           echo "lock_sha256=$(sha256sum acai/lock.json | cut -d' ' -f1)"
-          test ! -e "${XDG_RUNTIME_DIR:-/run/user/0}/containers/auth.json" || { echo "::error::auth.json presente"; exit 42; }
+          echo "toolchain (rpm -qa, registro):"
+          rpm -qa --qf '%{NEVRA}\n' 2>/dev/null | sort | tail -60 || true
+          rm -rf /var/tmp/acai || true
+          echo "workspace_destruido=confirmado"
+          if [ -e "${XDG_RUNTIME_DIR:-/run/user/0}/containers/auth.json" ]; then
+            echo "::error::auth.json presente"; exit 42
+          fi
           echo "sem_login_registry=confirmado sem_artefato=confirmado sem_atestacao=confirmada"

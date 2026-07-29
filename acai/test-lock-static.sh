@@ -31,9 +31,15 @@ done < <(grep -h 'uses:' $FILES_CI)
 
 # 3. Referências mutáveis proibidas no caminho de build.
 BAD='(:latest|--latestfrom|koji |list-sidetags|mirrorlist|metalink|releases/latest|fedora-coreos:stable|fedora-coreos:next|fedora-coreos:testing)'
-for f in $FILES_CI $FILES_SH acai/patches/*.patch; do
-  if grep -nE "$BAD" "$f" | grep -v "BAD='" ; then
+for f in $FILES_CI $FILES_SH; do
+  if grep -nE "$BAD" "$f" | grep -vE "BAD='|lockcheck-ok" ; then
     err "referência mutável em $f (acima)"
+  fi
+done
+# Patches: só linhas ADICIONADAS podem ser exigidas limpas (contexto é do upstream).
+for f in acai/patches/*.patch; do
+  if grep -E '^\+' "$f" | grep -nE "$BAD" ; then
+    err "referência mutável ADICIONADA por $f (acima)"
   fi
 done
 
@@ -64,6 +70,18 @@ fi
 grep -q 'workflow_dispatch' "$FILES_CI" || err "workflow_dispatch ausente"
 grep -qE '^[[:space:]]*(push|pull_request|schedule|release):' "$FILES_CI" && err "gatilho automático proibido presente" || true
 grep -qE '^[[:space:]]*inputs:' "$FILES_CI" && err "inputs livres proibidos no dispatch" || true
+
+# 8. Cada patch em acai/patches/ deve ter seu sha256 real registrado no lock.
+for p in acai/patches/*.patch; do
+  [ -e "$p" ] || { err "nenhum patch encontrado"; break; }
+  psha="$(sha256sum "$p" | cut -d' ' -f1)"
+  grep -q "$psha" "$LOCK" || err "sha256 real de $p não consta no lock"
+done
+
+# 9. O digest do container do workflow deve constar no lock.
+wf_digest="$(grep -oE 'image:.*@sha256:[0-9a-f]{64}' "$FILES_CI" | grep -oE 'sha256:[0-9a-f]{64}')"
+[ -n "$wf_digest" ] || err "container do workflow sem digest"
+grep -q "$wf_digest" "$LOCK" || err "digest do container do workflow não consta no lock"
 
 if [ "$fail" -ne 0 ]; then
   echo "::error::test-lock-static: FALHOU"
