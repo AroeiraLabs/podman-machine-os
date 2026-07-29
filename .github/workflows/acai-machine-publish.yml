@@ -1,0 +1,148 @@
+name: Acai P4-3B publish
+
+# Run único de build + publicação do candidato, manual e fail-closed.
+# Decisão de Alan Leite (2026-07-29, canal do executor/D-009): run único com
+# publicação para uso interno; gates P4-3A-SL (emendado) e P4-3B como base.
+# Publica por digest em ghcr.io/aroeiralabs/podman-machine-os com SBOM,
+# scan e as duas atestações nativas para o MESMO digest.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: acai-p4-3b-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Locked build + publish AppleHV/arm64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    container:
+      # Mesma imagem FCOS pinada do lock (filho linux/arm64)
+      image: quay.io/fedora/fedora-coreos@sha256:4273f06f799e1a114c57ed42eaa8295cc586f1c5860256b1b89c3b3c7cf5b1a6
+      options: --privileged -v /dev:/dev -v /lib/modules:/lib/modules -v /var --tmpfs /run --tmpfs /tmp
+    steps:
+      - name: Checkout da main aprovada
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Teste estático do lock (fail-closed)
+        shell: bash
+        run: bash acai/test-lock-static.sh
+
+      - name: Toolchain presa ao snapshot GA verificado
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "aarch64"
+          rm -f /etc/yum.repos.d/*.repo
+          cat > /etc/yum.repos.d/acai-f44-ga-locked.repo <<'ACAIREPO'
+          [acai-f44-ga-locked]
+          name=Fedora 44 GA (locked)
+          baseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/
+          enabled=1
+          gpgcheck=1
+          gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary
+          metadata_expire=never
+          ACAIREPO
+          dnf makecache --refresh
+          ACAI_REPOMD="$(find /var/cache -path '*acai-f44-ga-locked*' -name repomd.xml | head -1)"
+          echo "ad124f8125666e9059d7a8180427bdaea80f6286f71140457e5c7edd95883eee  ${ACAI_REPOMD}" | sha256sum -c -
+          # Lista idêntica a toolchain_packages do acai/lock.json (revisada em PR)
+          dnf install -y --disablerepo='*' --enablerepo=acai-f44-ga-locked \
+            git curl podman buildah zstd osbuild osbuild-tools \
+            osbuild-ostree rpm-ostree xfsprogs e2fsprogs jq dosfstools \
+            util-linux-core gh
+
+      - name: Ferramentas de SBOM e scan pinadas (acai/lock.json)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in syft grype; do
+            url=$(jq -r ".tools[] | select(.name==\"$tool\") | .url" acai/lock.json)
+            sha=$(jq -r ".tools[] | select(.name==\"$tool\") | .sha256" acai/lock.json)
+            curl -fsSL -o "/tmp/$tool.tgz" "$url"
+            echo "$sha  /tmp/$tool.tgz" | sha256sum -c -
+            tar -xzf "/tmp/$tool.tgz" -C /usr/local/bin "$tool"
+          done
+          syft version; grype version
+
+      - name: Verificação do source-lock (fail-closed)
+        shell: bash
+        run: bash acai/verify-lock.sh
+
+      - name: Build travado AppleHV/arm64 (saída preservada)
+        shell: bash
+        env:
+          ACAI_KEEP_OUT: "1"
+        run: bash acai/build-applehv.sh
+
+      - name: SBOM SPDX do artefato final
+        shell: bash
+        run: |
+          set -euo pipefail
+          syft "oci-archive:/var/tmp/acai/out/podman-machine.aarch64.oci" \
+            -o spdx-json=/var/tmp/acai/out/sbom.spdx.json
+          test "$(stat -c%s /var/tmp/acai/out/sbom.spdx.json)" -le 16777216
+          jq -e '.spdxVersion' /var/tmp/acai/out/sbom.spdx.json >/dev/null
+
+      - name: Scan de vulnerabilidades (limite V1 - zero criticas/altas)
+        shell: bash
+        run: |
+          set -euo pipefail
+          grype "sbom:/var/tmp/acai/out/sbom.spdx.json" --fail-on high
+
+      - name: Publicar por digest no GHCR
+        id: publish
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          podman login -u "$GITHUB_ACTOR" --password-stdin ghcr.io <<<"$GHCR_TOKEN"
+          bash acai/publish-applehv.sh
+
+      - name: Atestação de proveniência (mesmo digest)
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-name: ghcr.io/aroeiralabs/podman-machine-os
+          subject-digest: ${{ steps.publish.outputs.digest }}
+          push-to-registry: true
+
+      - name: Atestação de SBOM (mesmo digest)
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ghcr.io/aroeiralabs/podman-machine-os
+          subject-digest: ${{ steps.publish.outputs.digest }}
+          sbom-path: /var/tmp/acai/out/sbom.spdx.json
+          push-to-registry: true
+
+      - name: Verificação independente das atestações
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh attestation verify \
+            "oci://ghcr.io/aroeiralabs/podman-machine-os@${{ steps.publish.outputs.digest }}" \
+            --owner AroeiraLabs
+
+      - name: Relatório sanitizado e limpeza incondicional
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "workflow_sha=${GITHUB_SHA}"
+          echo "digest_publicado=${{ steps.publish.outputs.digest || 'NENHUM' }}"
+          echo "lock_sha256=$(sha256sum acai/lock.json | cut -d' ' -f1)"
+          podman logout ghcr.io 2>/dev/null || true
+          rm -f "${XDG_RUNTIME_DIR:-/run/user/0}/containers/auth.json" || true
+          rm -rf /var/tmp/acai || true
+          echo "logout_e_workspace_destruidos=confirmado"

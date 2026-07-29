@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Acai P4-3A — teste determinístico estático do source-lock.
+# Acai P4-3A/B — teste determinístico estático do source-lock.
 # Rejeita referências mutáveis e inputs fora do lock. Roda em bash puro
 # (sem jq) para poder executar antes do bootstrap e em revisão local.
 set -euo pipefail
@@ -9,14 +9,16 @@ cd "$(dirname "$0")/.."
 fail=0
 err() { printf '::error::test-lock-static: %s\n' "$*"; fail=1; }
 
-FILES_CI=".github/workflows/acai-machine-runner-probe.yml"
-FILES_SH="acai/verify-lock.sh acai/build-applehv.sh acai/test-lock-static.sh"
+PROBE_CI=".github/workflows/acai-machine-runner-probe.yml"
+PUB_CI=".github/workflows/acai-machine-publish.yml"
+FILES_CI="$PROBE_CI $PUB_CI"
+FILES_SH="acai/verify-lock.sh acai/build-applehv.sh acai/publish-applehv.sh acai/test-lock-static.sh"
 LOCK="acai/lock.json"
 
-# 1. Só o workflow do probe pode existir.
+# 1. Só os dois workflows autorizados podem existir.
 for wf in .github/workflows/*.yml .github/workflows/*.yaml; do
   [ -e "$wf" ] || continue
-  [ "$wf" = "$FILES_CI" ] || err "workflow não autorizado presente: $wf"
+  case "$wf" in "$PROBE_CI"|"$PUB_CI") : ;; *) err "workflow não autorizado presente: $wf" ;; esac
 done
 
 # 2. Toda action usada deve ser pinada por SHA de 40 hex.
@@ -43,10 +45,12 @@ for f in acai/patches/*.patch; do
   fi
 done
 
-# 4. Imagens de container no workflow devem ser referenciadas por digest.
-if grep -E 'image:' "$FILES_CI" | grep -vqE '@sha256:[0-9a-f]{64}'; then
-  err "imagem de container sem digest no workflow"
-fi
+# 4. Imagens de container nos workflows devem ser referenciadas por digest.
+for f in $FILES_CI; do
+  if grep -E 'image:' "$f" | grep -vqE '@sha256:[0-9a-f]{64}'; then
+    err "imagem de container sem digest em $f"
+  fi
+done
 
 # 5. Lock: sha256 de 64 hex, commits de 40 hex, hosts na allowlist.
 grep -oE '"sha256": "[^"]*"' "$LOCK" | grep -vqE '"[0-9a-f]{64}"$' && err "sha256 inválido no lock" || true
@@ -60,16 +64,23 @@ while IFS= read -r url; do
   case "$url" in https://*) : ;; *) err "URL não-https no lock: $url" ;; esac
 done < <(grep -oE '"url": "[^"]*"' "$LOCK" | cut -d'"' -f4)
 
-# 6. O workflow não pode conter permissões/ações de publicação.
-FORB='(packages:[[:space:]]*write|id-token:[[:space:]]*write|attestations:[[:space:]]*write|podman login|docker login|buildah login|push |actions/upload-artifact|actions/cache)'
-if grep -nE "$FORB" "$FILES_CI"; then
-  err "capacidade de publicação/persistência no workflow (acima)"
+# 6a. O PROBE não pode conter permissões/ações de publicação.
+FORB_PROBE='(packages:[[:space:]]*write|id-token:[[:space:]]*write|attestations:[[:space:]]*write|podman login|docker login|buildah login|push |actions/upload-artifact|actions/cache)'
+if grep -nE "$FORB_PROBE" "$PROBE_CI"; then
+  err "capacidade de publicação/persistência no PROBE (acima)"
+fi
+# 6b. O PUBLISH não pode ter cache, artefato persistido ou gatilho perigoso.
+FORB_PUB='(actions/upload-artifact|actions/cache|pull_request_target)'
+if grep -nE "$FORB_PUB" "$PUB_CI"; then
+  err "capacidade proibida no PUBLISH (acima)"
 fi
 
-# 7. Gatilho: somente workflow_dispatch, sem inputs.
-grep -q 'workflow_dispatch' "$FILES_CI" || err "workflow_dispatch ausente"
-grep -qE '^[[:space:]]*(push|pull_request|schedule|release):' "$FILES_CI" && err "gatilho automático proibido presente" || true
-grep -qE '^[[:space:]]*inputs:' "$FILES_CI" && err "inputs livres proibidos no dispatch" || true
+# 7. Gatilho: somente workflow_dispatch, sem inputs (ambos).
+for f in $FILES_CI; do
+  grep -q 'workflow_dispatch' "$f" || err "workflow_dispatch ausente em $f"
+  grep -qE '^[[:space:]]*(push|pull_request|schedule|release):' "$f" && err "gatilho automático proibido em $f" || true
+  grep -qE '^[[:space:]]*inputs:' "$f" && err "inputs livres proibidos em $f" || true
+done
 
 # 8. Cada patch em acai/patches/ deve ter seu sha256 real registrado no lock.
 for p in acai/patches/*.patch; do
@@ -78,10 +89,12 @@ for p in acai/patches/*.patch; do
   grep -q "$psha" "$LOCK" || err "sha256 real de $p não consta no lock"
 done
 
-# 9. O digest do container do workflow deve constar no lock.
-wf_digest="$(grep -oE 'image:.*@sha256:[0-9a-f]{64}' "$FILES_CI" | grep -oE 'sha256:[0-9a-f]{64}')"
-[ -n "$wf_digest" ] || err "container do workflow sem digest"
-grep -q "$wf_digest" "$LOCK" || err "digest do container do workflow não consta no lock"
+# 9. O digest do container de cada workflow deve constar no lock.
+for f in $FILES_CI; do
+  wf_digest="$(grep -oE 'image:.*@sha256:[0-9a-f]{64}' "$f" | grep -oE 'sha256:[0-9a-f]{64}')"
+  [ -n "$wf_digest" ] || err "container sem digest em $f"
+  grep -q "$wf_digest" "$LOCK" || err "digest do container de $f não consta no lock"
+done
 
 if [ "$fail" -ne 0 ]; then
   echo "::error::test-lock-static: FALHOU"
