@@ -1,6 +1,6 @@
 --- a/podman-image/build_common.sh
 +++ b/podman-image/build_common.sh
-@@ -78,29 +78,28 @@
+@@ -78,29 +78,34 @@
  # 4. Even though the URLs mention `rawhide`, the repo and gpg files are Fedora
  # release agnostic and such `rawhide` URLs are unlikely to change compared to URLs
  # containing Fedora release numbers.
@@ -14,10 +14,8 @@
 -    FILE="/var/tmp/rpms/*.rpm"
 -    if [[ -n $(echo $FILE) ]]; then dnf update -y --best --allowerasing $FILE; fi
 +# ACAI P4-3A source-lock: sem repositorio dinamico (COPR/Packit). O dnf fica
-+# preso a dois snapshots imutaveis conferidos NO CACHE que ele consome: o repo
-+# GA congelado e o snapshot de updates (necessario para as correcoes de
-+# seguranca publicadas apos o GA). RPMs de containers chegam pre-verificados
-+# (sha256 + assinatura) em /var/tmp/rpms via acai/verify-lock.sh.
++# preso a dois snapshots imutaveis conferidos NO CACHE que ele consome. RPMs de
++# containers chegam pre-verificados em /var/tmp/rpms via acai/verify-lock.sh.
 +rm -f /etc/yum.repos.d/*.repo
 +printf '%s\n' '[acai-f44-ga-locked]' 'name=acai-f44-ga-locked' 'baseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/' 'enabled=1' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary' 'metadata_expire=never' > /etc/yum.repos.d/acai-f44-ga-locked.repo
 +printf '%s\n' '[acai-f44-updates-locked]' 'name=acai-f44-updates-locked' 'baseurl=https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/aarch64/' 'enabled=1' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary' 'metadata_expire=never' > /etc/yum.repos.d/acai-f44-updates-locked.repo
@@ -28,7 +26,15 @@
 +ACAI_RPMS=(/var/tmp/rpms/*.rpm)
 +if [[ ${#ACAI_RPMS[@]} -eq 0 ]]; then echo "ACAI STOP: nenhum RPM pre-verificado em /var/tmp/rpms"; exit 42; fi
 +dnf install -y --best --allowerasing --disablerepo='*' --enablerepo=acai-f44-ga-locked,acai-f44-updates-locked "${ACAI_RPMS[@]}"
-+dnf upgrade -y --disablerepo='*' --enablerepo=acai-f44-ga-locked,acai-f44-updates-locked
++# O kernel NAO entra no upgrade. Kernels sao installonly: o dnf instala o novo
++# AO LADO do que veio da base, e a imagem passa a ter dois. O disco gerado a
++# partir dela arranca no kernel mais novo sem a configuracao de boot
++# correspondente e entra em kernel panic (VFS: Unable to mount root fs, root=
++# vazio) — reproduzido no primeiro boot do digest cdf90b1b. Trocar o kernel de
++# uma imagem bootc exige uma base FCOS nova, nao um dnf upgrade.
++dnf upgrade -y --disablerepo='*' --enablerepo=acai-f44-ga-locked,acai-f44-updates-locked --exclude='kernel*'
++rpm -q kernel --qf 'ACAI kernel na imagem: %{NEVRA}\n' | sort -u
++if [[ $(rpm -q kernel | wc -l) -ne 1 ]]; then echo "ACAI STOP: imagem com mais de um kernel"; rpm -q kernel; exit 42; fi
  
 -    # Temporary get the dependency packages from f44-podman6 so we can get working deps for containers-common and netavark for 6.0.
 -    curl --fail -o /etc/yum.repos.d/rhcontainerbot-f44-podman6-fedora.repo https://copr.fedorainfracloud.org/coprs/rhcontainerbot/f44-podman6/repo/fedora-44/rhcontainerbot-f44-podman6-fedora-44.repo
@@ -47,7 +53,7 @@
      subscription-manager device-mapper qemu-user-static-aarch64 qemu-user-static-x86
  
  # Set a custom variant to mark this image as our own for both fedora countme
-@@ -135,7 +134,7 @@
+@@ -135,7 +140,7 @@
      qemu-guest-agent
  )
  
