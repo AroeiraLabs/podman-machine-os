@@ -139,7 +139,14 @@ jobs:
           GHCR_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          podman login -u "$GITHUB_ACTOR" --password-stdin ghcr.io <<<"$GHCR_TOKEN"
+          # As actions de atestação com push-to-registry procuram credenciais no
+          # formato Docker em $HOME/.docker/config.json (em job de container,
+          # /github/home). O podman login grava no authfile dele, em outro
+          # caminho — por isso a credencial é escrita direto no formato esperado,
+          # que o podman também consome via --authfile.
+          mkdir -p /github/home/.docker
+          podman login --authfile /github/home/.docker/config.json \
+            -u "$GITHUB_ACTOR" --password-stdin ghcr.io <<<"$GHCR_TOKEN"
           bash acai/publish-applehv.sh
 
       - name: Atestação de proveniência (mesmo digest)
@@ -175,7 +182,10 @@ jobs:
           echo "workflow_sha=${GITHUB_SHA}"
           echo "digest_publicado=${{ steps.publish.outputs.digest || 'NENHUM' }}"
           echo "lock_sha256=$(sha256sum acai/lock.json | cut -d' ' -f1)"
+          podman logout --authfile /github/home/.docker/config.json ghcr.io 2>/dev/null || true
           podman logout ghcr.io 2>/dev/null || true
+          rm -f /github/home/.docker/config.json || true
           rm -f "${XDG_RUNTIME_DIR:-/run/user/0}/containers/auth.json" || true
           rm -rf /var/tmp/acai || true
+          test ! -e /github/home/.docker/config.json || { echo "::error::credencial remanescente"; exit 42; }
           echo "logout_e_workspace_destruidos=confirmado"
