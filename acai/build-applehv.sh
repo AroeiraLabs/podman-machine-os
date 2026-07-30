@@ -46,6 +46,10 @@ done < <(jq -r '.source.patches[].file' "$LOCK")
 if grep -RnE 'metalink|mirrorlist' "$SRC/podman-image"; then # lockcheck-ok
   die "referência a mirror/metalink restante no caminho de build" # lockcheck-ok
 fi
+grep -q 'acai-f44-updates-locked' "$SRC/podman-image/build_common.sh" \
+  || die "build_common.sh sem o snapshot de updates após patch"
+grep -q 'acai-f44-updates-locked' "$SRC/podman-image/Containerfile.COREOS" \
+  || die "Containerfile.COREOS sem o snapshot de updates após patch"
 grep -q 'acai-f44-ga-locked' "$SRC/podman-image/build_common.sh" \
   || die "build_common.sh sem o repo travado após patch"
 grep -q 'acai-f44-ga-locked' "$SRC/podman-image/Containerfile.COREOS" \

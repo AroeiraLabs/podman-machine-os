@@ -1,0 +1,26 @@
+# Acai P4-3B — regras de exceção do scan de vulnerabilidades.
+#
+# Contexto: o scan roda DUAS vezes no job. A primeira é informativa e imprime
+# TODOS os achados, sem exceção nenhuma — nada fica escondido do relatório. A
+# segunda é a que decide (fail-closed) e usa este arquivo.
+#
+# Única exceção, aprovada por Alan Leite em 2026-07-30 (D-012):
+#
+#   Achados em módulos Go (`go-module`).
+#
+# Justificativa: esses módulos são compilados estaticamente para dentro dos
+# binários do podman, buildah e afins pelo empacotador upstream. Não existe
+# atualização de RPM, nem escolha de versão no nosso lock, que os altere: eles
+# só mudam quando o upstream recompila. Manter a regra "zero altas" sobre eles
+# não produziria nenhuma ação corretiva possível — apenas impediria qualquer
+# publicação, indefinidamente.
+#
+# Reavaliação: a cada re-pin de release upstream do podman-machine-os. Se o
+# rebuild upstream não reduzir os achados, a decisão deve ser revista, não
+# renovada por inércia.
+#
+# O que NÃO é exceção: qualquer achado em RPM, python, ou outro tipo continua
+# barrando a publicação. Esses são acionáveis pelo snapshot de updates pinado.
+ignore:
+  - package:
+      type: go-module
