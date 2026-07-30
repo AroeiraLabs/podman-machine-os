@@ -28,14 +28,14 @@
       {
         "file": "acai/patches/0001-locked-build-common.patch",
         "applies_to": "podman-image/build_common.sh",
-        "sha256": "08fc9e4cc072a392ec433ec32edcf4b90218a6beea7975e539181c25d312ce09",
-        "purpose": "remove COPR/koji dinamicos; instala somente RPMs pre-verificados locais; prende TODO dnf ao snapshot GA com repomd verificado no cache do dnf (makecache + sha256 + --disablerepo)"
+        "sha256": "7823cb49b5928a6ed348b21e6685b908fd76f62f6074b5202cccc95d8f074ad1",
+        "purpose": "remove COPR/koji dinamicos; instala RPMs pre-verificados locais; prende TODO dnf aos DOIS snapshots pinados (GA + updates) com repomd conferido no cache do dnf e --disablerepo/--enablerepo; acrescenta 'dnf upgrade' restrito a esses snapshots para incorporar as correcoes de seguranca publicadas apos o GA (D-012)"
       },
       {
         "file": "acai/patches/0002-locked-containerfile.patch",
         "applies_to": "podman-image/Containerfile.COREOS",
-        "sha256": "2154cc69726390696bd55609638b04b732748c21526328154aedd729a45f7149",
-        "purpose": "prende o dnf da primeira stage ao mesmo snapshot GA verificado e REMOVE a chamada 'ostree container commit'. O verbo 'container' e extensao externa do ostree (/usr/libexec/libostree/ext/ostree-container, do pacote bootc no Fedora 42+), ausente nesta arvore; hoje so esvazia /run /tmp /var/tmp /var/cache e o upstream o documentou como nao recomendado. Nao ha substituto porque o build_common.sh ja faz 'dnf clean all' e 'rm -fr /var/cache', e /run e /tmp sao tmpfs em runtime; uma limpeza explicita falha nos bind mounts do proprio build (EBUSY em /run/build_common.sh e /var/tmp/rpms)"
+        "sha256": "100394eec5bb8708d68c6003ce4e540896e4817a686d10521388a5b4ae0284df",
+        "purpose": "prende o dnf da primeira stage aos mesmos dois snapshots pinados e REMOVE a chamada 'ostree container commit' (verbo e extensao externa do pacote bootc, ausente nesta arvore; hoje so esvazia /run /tmp /var/tmp /var/cache e o upstream documentou como nao recomendado)"
       }
     ]
   },
@@ -57,14 +57,26 @@
     }
   },
   "dnf": {
-    "repo_id": "acai-f44-ga-locked",
-    "baseurl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/",
-    "repomd_sha256": "ad124f8125666e9059d7a8180427bdaea80f6286f71140457e5c7edd95883eee",
-    "revision": "1776864863",
+    "repos": [
+      {
+        "repo_id": "acai-f44-ga-locked",
+        "baseurl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/",
+        "repomd_sha256": "ad124f8125666e9059d7a8180427bdaea80f6286f71140457e5c7edd95883eee",
+        "revision": "1776864863",
+        "note": "release GA, imutavel na pratica"
+      },
+      {
+        "repo_id": "acai-f44-updates-locked",
+        "baseurl": "https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/aarch64/",
+        "repomd_sha256": "bd7c09a02adfa2c939e40c0c353baa8915f12918b0498ce3aa7afafbae429d56",
+        "revision": "1785371920",
+        "note": "snapshot de updates coletado em 2026-07-30. Repo MUTAVEL na origem: o pin do repomd o congela para este build e qualquer deriva e stop, exigindo re-coleta e nova revisao (D-010)"
+      }
+    ],
     "gpgcheck": true,
     "gpgkey": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary",
-    "binding": "Todos os pontos de dnf (toolchain do job, build_common.sh e primeira stage do Containerfile) removem os .repo preexistentes, criam somente este repo com metadata_expire=never, rodam dnf makecache e conferem o sha256 do repomd.xml NO CACHE que o dnf consome; toda instalacao usa --disablerepo='*' --enablerepo=acai-f44-ga-locked. Snapshot imutavel na acepcao do gate: repo GA congelado + repomd pinado + gpgcheck; pacotes resolvidos sao registrados no relatorio (rpm -qa).",
-    "note": "O repo updates/44 e mutavel e NAO e habilitado; pacotes de updates entram como rpms diretos com sha256 abaixo."
+    "binding": "Todos os pontos de dnf (toolchain do job, build_common.sh e primeira stage do Containerfile) removem os .repo preexistentes, criam SOMENTE estes dois repos com metadata_expire=never, rodam dnf makecache e conferem o sha256 dos DOIS repomd.xml NO CACHE que o dnf consome; toda instalacao usa --disablerepo='*' --enablerepo com os dois ids. O conjunto resolvido e registrado no relatorio (rpm -qa).",
+    "rationale_updates": "O repo GA sozinho nao contem as correcoes de seguranca publicadas depois do lancamento, o que tornava inatingivel o limite de zero criticas/altas do gate. D-012 autoriza o segundo snapshot."
   },
   "rpms": [
     {
@@ -198,5 +210,11 @@
     "copr_repo_fetch_dinamico": "eliminado pelo patch 0001 (rpms locais pre-verificados)",
     "wsl_build": "fora de escopo (target somente applehv)",
     "fedora_version_runtime": "eliminado (fixado em 44, consistente com FCOS 44.20260707.3.1)"
+  },
+  "vulnerability_policy": {
+    "gate": "zero criticas e altas acionaveis",
+    "tool": "grype 0.116.1 com -c acai/grype.yaml",
+    "informational_run": "um scan sem excecoes roda antes do gate e imprime todos os achados no relatorio",
+    "accepted_exception": "achados em modulos Go: compilados estaticamente nos binarios upstream (podman, buildah), fora do alcance de qualquer escolha do lock; so mudam com rebuild upstream. Aprovado por Alan Leite em 2026-07-30 (D-012), a reavaliar a cada re-pin de release upstream"
   }
 }

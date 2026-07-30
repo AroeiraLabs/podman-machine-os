@@ -1,22 +1,21 @@
 --- a/podman-image/Containerfile.COREOS
 +++ b/podman-image/Containerfile.COREOS
-@@ -4,7 +4,14 @@
+@@ -4,7 +4,13 @@
  # format matches (fedora:latest can emit a newer policydb than FCOS semodule accepts).
  FROM ${FCOS_BASE_IMAGE} AS qemu_guest_agent_vsock_selinux
  COPY qemu_guest_agent_vsock.te /qemu_guest_agent_vsock.te
 -RUN dnf install -y checkpolicy policycoreutils && dnf clean all && \
 +RUN rm -f /etc/yum.repos.d/*.repo && \
-+    printf '%s\n' '[acai-f44-ga-locked]' 'name=Fedora 44 GA (locked)' \
-+      'baseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/' \
-+      'enabled=1' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary' \
-+      'metadata_expire=never' > /etc/yum.repos.d/acai-f44-ga-locked.repo && \
++    printf '%s\n' '[acai-f44-ga-locked]' 'name=acai-f44-ga-locked' 'baseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/' 'enabled=1' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary' 'metadata_expire=never' > /etc/yum.repos.d/acai-f44-ga-locked.repo && \
++    printf '%s\n' '[acai-f44-updates-locked]' 'name=acai-f44-updates-locked' 'baseurl=https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/aarch64/' 'enabled=1' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary' 'metadata_expire=never' > /etc/yum.repos.d/acai-f44-updates-locked.repo && \
 +    dnf makecache --refresh && \
 +    echo "ad124f8125666e9059d7a8180427bdaea80f6286f71140457e5c7edd95883eee  $(find /var/cache -path '*acai-f44-ga-locked*' -name repomd.xml | head -1)" | sha256sum -c - && \
-+    dnf install -y --disablerepo='*' --enablerepo=acai-f44-ga-locked checkpolicy policycoreutils && dnf clean all && \
++    echo "bd7c09a02adfa2c939e40c0c353baa8915f12918b0498ce3aa7afafbae429d56  $(find /var/cache -path '*acai-f44-updates-locked*' -name repomd.xml | head -1)" | sha256sum -c - && \
++    dnf install -y --disablerepo='*' --enablerepo=acai-f44-ga-locked,acai-f44-updates-locked checkpolicy policycoreutils && dnf clean all && \
      checkmodule -M -m -o /qemu_guest_agent_vsock.mod /qemu_guest_agent_vsock.te && \
      semodule_package -o /qemu_guest_agent_vsock.pp -m /qemu_guest_agent_vsock.mod
  
-@@ -14,7 +21,7 @@
+@@ -14,7 +20,7 @@
  ARG FEDORA_VERSION=${FEDORA_VERSION}
  
  RUN --mount=type=bind,source=/build_common.sh,target=/run/build_common.sh,z \

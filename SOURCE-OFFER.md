@@ -36,17 +36,20 @@ verified fail-closed before any install:
 1. **Directly enumerated objects** — the container-stack RPMs, GPG keys, OCI
    images (index digest, arm64 child digest, and their index-membership
    relation) and patches (SHA-256 each), verified by `acai/verify-lock.sh`.
-2. **Frozen repository snapshot** — every remaining DNF resolution (job
+2. **Frozen repository snapshots** — every remaining DNF resolution (job
    toolchain, `build_common.sh`, and the Containerfile first stage) is bound to
-   the frozen Fedora 44 GA repository only: fixed host, `repomd.xml` SHA-256
+   exactly two pinned snapshots: the Fedora 44 GA repository and a Fedora 44
+   `updates` snapshot. Both use a fixed host, have their `repomd.xml` SHA-256
    verified in the cache DNF actually consumes (after `dnf makecache`),
-   `metadata_expire=never`, gpgcheck enabled, and
-   `--disablerepo='*' --enablerepo=acai-f44-ga-locked` on every install. The
-   resolved package set is deterministic for a fixed repomd and is recorded in
-   the sanitized run report (`rpm -qa`).
+   `metadata_expire=never`, gpgcheck enabled, and are the only repositories
+   enabled on every install (`--disablerepo='*' --enablerepo=…`). The resolved
+   package set is deterministic for fixed repomd files and is recorded in the
+   sanitized run report (`rpm -qa`).
 
-The mutable `updates` repository is never enabled; individual packages taken
-from it are pinned by URL + SHA-256 in the lock.
+The `updates` repository is mutable at the origin; pinning its `repomd.xml`
+freezes it for this build, and any drift is a hard stop requiring fresh
+collection and review. It is included because the GA repository alone does not
+carry the security fixes published after release.
 
 ## Required record before any P4-3B publication
 
