@@ -32,7 +32,8 @@ buildah manifest add --arch arm64 "$FULL" "$FULL-arm64"
 buildah manifest add --artifact --artifact-type="" --os=linux --arch=aarch64 \
   --annotation "disktype=applehv" "$FULL" "$ZST"
 
-podman manifest push --all --digestfile "$OUT/digest.txt" "$FULL" "docker://$FULL"
+podman manifest push --all --authfile /github/home/.docker/config.json \
+  --digestfile "$OUT/digest.txt" "$FULL" "docker://$FULL"
 DIGEST=$(cat "$OUT/digest.txt")
 echo "$DIGEST" | grep -qE '^sha256:[0-9a-f]{64}$' || die "digest inválido após push"
 
