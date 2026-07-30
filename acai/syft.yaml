@@ -1,0 +1,34 @@
+# Acai P4-3B — configuração do syft para a SBOM do artefato final.
+#
+# Objetivo: preservar integralmente a enumeração POR COMPONENTE que o gate
+# exige (pacotes, versões e licenças) e remover apenas metadados que nenhum
+# controle usa e que respondem pela maior parte do tamanho.
+#
+# Por que o tamanho importa: 16 MiB não é um número escolhido por nós. É uma
+# trava rígida no código da própria action de atestação
+# (MAX_SBOM_SIZE_BYTES = 16 * 1024 * 1024 em actions/attest/src/sbom.ts,
+# verificada na v4.1.0), aplicada com fs.stat sobre o arquivo em disco, antes
+# de assinar e antes de qualquer push. Não há como contorná-la comprimindo,
+# dividindo ou publicando por outro caminho — e o GitHub recusou expressamente
+# um pedido de flag para ultrapassá-la (actions/attest#402). O teto do gate,
+# portanto, está correto: quem tem de caber é a SBOM.
+
+# Lista de arquivos por pacote: fora. A correspondência com o artefato é feita
+# por digest, e a correspondência por pacote pelo rpm -qa do relatório.
+file:
+  metadata:
+    selection: none
+    digests: []
+  content:
+    globs: []
+  executable:
+    globs: []
+
+# Relações pacote-arquivo: fora, pela mesma razão. São elas que geram os
+# blocos CONTAINS/hasFiles do SPDX, hoje o grosso do que resta.
+relationships:
+  package-file-ownership: false
+  package-file-ownership-overlap: false
+
+# Uma entrada por pacote, não uma por camada.
+scope: squashed
