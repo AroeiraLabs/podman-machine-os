@@ -1,6 +1,6 @@
 --- a/podman-image/build_common.sh
 +++ b/podman-image/build_common.sh
-@@ -78,29 +78,34 @@
+@@ -78,29 +78,29 @@
  # 4. Even though the URLs mention `rawhide`, the repo and gpg files are Fedora
  # release agnostic and such `rawhide` URLs are unlikely to change compared to URLs
  # containing Fedora release numbers.
@@ -13,9 +13,9 @@
 -    shopt -s nullglob
 -    FILE="/var/tmp/rpms/*.rpm"
 -    if [[ -n $(echo $FILE) ]]; then dnf update -y --best --allowerasing $FILE; fi
-+# ACAI P4-3A source-lock: sem repositorio dinamico (COPR/Packit). O dnf fica
-+# preso a dois snapshots imutaveis conferidos NO CACHE que ele consome. RPMs de
-+# containers chegam pre-verificados em /var/tmp/rpms via acai/verify-lock.sh.
++# ACAI P4-3A source-lock: dnf preso a dois snapshots imutaveis conferidos NO
++# CACHE que ele consome. RPMs de containers chegam pre-verificados via
++# acai/verify-lock.sh.
 +rm -f /etc/yum.repos.d/*.repo
 +printf '%s\n' '[acai-f44-ga-locked]' 'name=acai-f44-ga-locked' 'baseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/aarch64/os/' 'enabled=1' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary' 'metadata_expire=never' > /etc/yum.repos.d/acai-f44-ga-locked.repo
 +printf '%s\n' '[acai-f44-updates-locked]' 'name=acai-f44-updates-locked' 'baseurl=https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/aarch64/' 'enabled=1' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary' 'metadata_expire=never' > /etc/yum.repos.d/acai-f44-updates-locked.repo
@@ -24,16 +24,11 @@
 +echo "bd7c09a02adfa2c939e40c0c353baa8915f12918b0498ce3aa7afafbae429d56  $(find /var/cache -path '*acai-f44-updates-locked*' -name repomd.xml | head -1)" | sha256sum -c -
 +shopt -s nullglob
 +ACAI_RPMS=(/var/tmp/rpms/*.rpm)
-+if [[ ${#ACAI_RPMS[@]} -eq 0 ]]; then echo "ACAI STOP: nenhum RPM pre-verificado em /var/tmp/rpms"; exit 42; fi
++if [[ ${#ACAI_RPMS[@]} -eq 0 ]]; then echo "ACAI STOP: nenhum RPM pre-verificado"; exit 42; fi
 +dnf install -y --best --allowerasing --disablerepo='*' --enablerepo=acai-f44-ga-locked,acai-f44-updates-locked "${ACAI_RPMS[@]}"
-+# O kernel NAO entra no upgrade. Kernels sao installonly: o dnf instala o novo
-+# AO LADO do que veio da base, e a imagem passa a ter dois. O disco gerado a
-+# partir dela arranca no kernel mais novo sem a configuracao de boot
-+# correspondente e entra em kernel panic (VFS: Unable to mount root fs, root=
-+# vazio) — reproduzido no primeiro boot do digest cdf90b1b. Trocar o kernel de
-+# uma imagem bootc exige uma base FCOS nova, nao um dnf upgrade.
++# Kernel fora do upgrade: kernels sao installonly e o novo entraria AO LADO do
++# da base, gerando imagem com dois kernels cujo disco entra em kernel panic.
 +dnf upgrade -y --disablerepo='*' --enablerepo=acai-f44-ga-locked,acai-f44-updates-locked --exclude='kernel*'
-+rpm -q kernel --qf 'ACAI kernel na imagem: %{NEVRA}\n' | sort -u
 +if [[ $(rpm -q kernel | wc -l) -ne 1 ]]; then echo "ACAI STOP: imagem com mais de um kernel"; rpm -q kernel; exit 42; fi
  
 -    # Temporary get the dependency packages from f44-podman6 so we can get working deps for containers-common and netavark for 6.0.
@@ -53,7 +48,7 @@
      subscription-manager device-mapper qemu-user-static-aarch64 qemu-user-static-x86
  
  # Set a custom variant to mark this image as our own for both fedora countme
-@@ -135,7 +140,7 @@
+@@ -135,7 +135,7 @@
      qemu-guest-agent
  )
  
@@ -62,3 +57,19 @@
  
  # Remove unwanted packages (mainly relevant for coreos)
  dnf remove -y moby-engine containerd runc toolbox qed-firmware docker-cli
+@@ -147,3 +147,15 @@
+ systemctl enable rhsmcertd.service
+ # Patching qemu backed binfmt configurations to use the actual executable's permissions and not the interpreter's
+ for x in /usr/lib/binfmt.d/*.conf; do sed 's/\(:[^C:]*\)$/\1PC/' "$x" | tee /etc/binfmt.d/"$(basename "$x")"; done
++
++# Imagem "golden": o machine-id tem de ficar VAZIO. Com ele populado, o systemd
++# nao reconhece primeiro boot, nao executa 'systemctl preset-all', e os presets
++# que o Ignition grava (enable ready.service, podman.socket, rosetta-activation,
++# immutable-root-*) nunca viram symlink: NENHUMA unidade e habilitada, o guest
++# nunca envia o sinal de prontidao e o 'podman machine start' espera para sempre.
++# Reproduzido no digest b24439b8, cujo /usr/etc/machine-id tinha 33 bytes.
++# Efeito colateral do arquivo populado: toda VM criada da imagem nasceria com o
++# MESMO machine-id. O upstream nao trata isso porque nao roda dnf upgrade; nos
++# rodamos, e o scriptlet do systemd gera o arquivo.
++: > /etc/machine-id
++test ! -s /etc/machine-id || { echo "ACAI STOP: machine-id nao ficou vazio"; exit 42; }

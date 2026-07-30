@@ -28,8 +28,8 @@
       {
         "file": "acai/patches/0001-locked-build-common.patch",
         "applies_to": "podman-image/build_common.sh",
-        "sha256": "f0c177757e62a87ae9fb96d407423a61b5f4b0e0fae120756b82dfc2fc6be439",
-        "purpose": "remove COPR/koji dinamicos; instala RPMs pre-verificados locais; prende TODO dnf aos dois snapshots pinados (GA + updates) com repomd conferido no cache; 'dnf upgrade' EXCLUI kernel* porque kernels sao installonly e o novo entra AO LADO do da base, produzindo imagem com dois kernels cujo disco arranca sem configuracao de boot valida (kernel panic reproduzido no digest cdf90b1b); guarda fail-closed aborta se restar mais de um kernel"
+        "sha256": "11c09b730f1e650700b47a77f706a62fe5a3dbe4a88d32feb5f557edf8d5b5ff",
+        "purpose": "prende TODO dnf aos dois snapshots pinados; instala RPMs pre-verificados; exclui kernel* do upgrade (installonly: dois kernels quebram o boot); e ESVAZIA /etc/machine-id ao fim. Com machine-id populado o systemd nao reconhece primeiro boot, nao roda 'systemctl preset-all' e os presets do Ignition nunca viram symlink: nenhuma unidade habilitada, ready.service nao roda e 'podman machine start' espera para sempre (reproduzido no digest b24439b8). Guardas fail-closed: mais de um kernel, ou machine-id nao vazio, abortam o build"
       },
       {
         "file": "acai/patches/0002-locked-containerfile.patch",
@@ -242,5 +242,11 @@
     "reason": "kernels sao installonly: o dnf instala ao lado, nao substitui. A imagem resultante tem dois kernels e o disco gerado entra em kernel panic (VFS: Unable to mount root fs, root= vazio). Reproduzido no primeiro boot do digest sha256:cdf90b1b... em 2026-07-30; log de console preservado.",
     "correct_remediation": "trocar a base FCOS pinada por um release novo, que ja traz o kernel corrigido e composto corretamente",
     "guard": "o build aborta se a imagem terminar com mais de um kernel"
+  },
+  "boot_policy": {
+    "machine_id": "deve ficar vazio na imagem; o build aborta se nao estiver",
+    "reason": "o systemd so aplica os presets gravados pelo Ignition quando detecta primeiro boot, o que depende de /etc/machine-id vazio. Populado, nenhuma unidade e habilitada — inclusive ready.service, que envia o sinal de prontidao ao host. Efeito colateral adicional: todas as VMs nasceriam com o mesmo machine-id.",
+    "evidence": "digest sha256:b24439b8... booto​u e ficou inacessivel ao 'podman machine start'; /usr/etc/machine-id da imagem tinha 33 bytes",
+    "upstream_note": "o upstream nao trata machine-id porque nao executa dnf upgrade; o scriptlet do systemd e que gera o arquivo"
   }
 }

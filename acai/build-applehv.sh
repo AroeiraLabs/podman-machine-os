@@ -63,6 +63,13 @@ podman build -t "$IMAGE_TAG" \
   --build-arg PODMAN_PR_NUM=""
 
 # Sanidade: a versão do podman dentro da imagem deve ser a do lock.
+# Imagem "golden": machine-id vazio. Populado, o systemd não reconhece primeiro
+# boot, não roda 'systemctl preset-all', e nada do que o Ignition pede fica
+# habilitado — o guest sobe mas nunca sinaliza prontidão.
+MID=$(podman run --rm --cgroups=disabled "$IMAGE_TAG" sh -c 'wc -c < /etc/machine-id' | tr -d ' ')
+[ "$MID" = "0" ] || die "machine-id da imagem não está vazio ($MID bytes) — o guest não completaria o start"
+note "machine-id da imagem: vazio (0 bytes)"
+
 GOT=$(podman run --rm --cgroups=disabled "$IMAGE_TAG" podman --version | awk '{print $3}')
 WANT=$(jq -r '.rpms[] | select(.name=="podman") | .nevra' "$LOCK" | sed -E 's/^podman-[0-9]+:([0-9.]+)-.*/\1/')
 [ "$GOT" = "$WANT" ] || die "podman na imagem ($GOT) difere do lock ($WANT)"
