@@ -19,8 +19,43 @@
 # rebuild upstream não reduzir os achados, a decisão deve ser revista, não
 # renovada por inércia.
 #
-# O que NÃO é exceção: qualquer achado em RPM, python, ou outro tipo continua
-# barrando a publicação. Esses são acionáveis pelo snapshot de updates pinado.
+# Segunda exceção, aprovada por Alan Leite em 2026-07-30 (D-013):
+#
+#   Pacotes do kernel.
+#
+# Justificativa: kernels são installonly. Um `dnf upgrade` instala o novo AO
+# LADO do que veio da base, e a imagem resultante tem dois kernels; o disco
+# gerado arranca no mais novo sem a configuração de boot correspondente e entra
+# em kernel panic. Isso não é hipótese: foi reproduzido no primeiro boot do
+# digest sha256:cdf90b1b..., com log de console preservado. Trocar o kernel de
+# uma imagem bootc exige uma base FCOS nova, composta corretamente.
+#
+# Ou seja, o achado é real mas a remediação por dnf é pior que o risco: torna a
+# imagem inutilizável. A remediação verdadeira é re-pinar a base FCOS, e ela
+# não depende deste arquivo.
+#
+# Risco residual, declarado: o kernel é exatamente o que a base Fedora CoreOS
+# entrega e o mesmo que o podman-machine-os upstream distribui — não estamos
+# em posição pior que a referência. O guest é efêmero, não monta o /Users do
+# host e é destruído por execução.
+#
+# GATILHO DE REMEDIAÇÃO — esta exceção não deve ser renovada por inércia:
+# assim que o Fedora CoreOS publicar um release novo no stream stable, re-pinar
+# a base no lock e reconstruir. Na coleta de 2026-07-30 o stable estava em
+# 44.20260707.3.1, inalterado desde 21/07.
+#
+# O que NÃO é exceção: qualquer outro achado em RPM, python ou outro tipo
+# continua barrando a publicação. Esses são acionáveis pelo snapshot de updates.
 ignore:
   - package:
       type: go-module
+  - package:
+      name: kernel
+  - package:
+      name: kernel-core
+  - package:
+      name: kernel-modules
+  - package:
+      name: kernel-modules-core
+  - package:
+      name: kernel-modules-extra

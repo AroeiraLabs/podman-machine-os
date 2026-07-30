@@ -215,7 +215,20 @@
     "gate": "zero criticas e altas acionaveis",
     "tool": "grype 0.116.1 com -c acai/grype.yaml",
     "informational_run": "um scan sem excecoes roda antes do gate e imprime todos os achados no relatorio",
-    "accepted_exception": "achados em modulos Go: compilados estaticamente nos binarios upstream (podman, buildah), fora do alcance de qualquer escolha do lock; so mudam com rebuild upstream. Aprovado por Alan Leite em 2026-07-30 (D-012), a reavaliar a cada re-pin de release upstream"
+    "accepted_exceptions": [
+      {
+        "scope": "modulos Go (type: go-module)",
+        "reason": "compilados estaticamente nos binarios upstream (podman, buildah); fora do alcance do lock, so mudam com rebuild upstream",
+        "decision": "D-012 (2026-07-30)",
+        "review_trigger": "a cada re-pin de release upstream do podman-machine-os"
+      },
+      {
+        "scope": "pacotes do kernel (kernel, kernel-core, kernel-modules, kernel-modules-core, kernel-modules-extra)",
+        "reason": "kernels sao installonly: o upgrade instala ao lado e produz imagem com dois kernels, cujo disco entra em kernel panic (reproduzido no digest sha256:cdf90b1b). A remediacao por dnf torna a imagem inutilizavel; a remediacao real e re-pinar a base FCOS. O kernel e o mesmo que a base FCOS e o upstream entregam, e o guest e efemero, sem mounts do host",
+        "decision": "D-013 (2026-07-30)",
+        "review_trigger": "assim que o Fedora CoreOS publicar novo release no stream stable (em 2026-07-30 estava em 44.20260707.3.1, inalterado desde 21/07)"
+      }
+    ]
   },
   "sbom_policy": {
     "config": "acai/syft.yaml",
