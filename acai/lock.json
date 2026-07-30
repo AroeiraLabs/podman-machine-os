@@ -216,5 +216,12 @@
     "tool": "grype 0.116.1 com -c acai/grype.yaml",
     "informational_run": "um scan sem excecoes roda antes do gate e imprime todos os achados no relatorio",
     "accepted_exception": "achados em modulos Go: compilados estaticamente nos binarios upstream (podman, buildah), fora do alcance de qualquer escolha do lock; so mudam com rebuild upstream. Aprovado por Alan Leite em 2026-07-30 (D-012), a reavaliar a cada re-pin de release upstream"
+  },
+  "sbom_policy": {
+    "config": "acai/syft.yaml",
+    "hard_limit_bytes": 16777216,
+    "limit_source": "trava rigida da action de atestacao: MAX_SBOM_SIZE_BYTES = 16*1024*1024 em actions/attest/src/sbom.ts (v4.1.0), aplicada com fs.stat sobre o arquivo antes de assinar. Nao contornavel por compressao, divisao ou outro caminho de publicacao; pedido de flag para ultrapassar foi recusado pelo GitHub em actions/attest#402",
+    "preserved": "enumeracao por componente: pacotes, versoes e licencas",
+    "removed": "lista e digests de arquivos por pacote e relacoes pacote-arquivo (CONTAINS/hasFiles), que nenhum controle usa"
   }
 }

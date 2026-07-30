@@ -90,13 +90,16 @@ if [ "${ACAI_KEEP_OUT:-0}" = "1" ]; then
   # (16,93 MiB, acima do teto de 16 MiB do gate) e não é requisito de nenhum
   # controle — a correspondência com o artefato é feita por digest, e a
   # correspondência por pacote, pelo próprio rpm -qa registrado abaixo.
-  SYFT_FILE_METADATA_SELECTION=none \
-    syft "oci-archive:${OUT}/podman-machine" -o spdx-json="$OUT/sbom.spdx.json"
+  syft -c "$(pwd)/acai/syft.yaml" \
+    "oci-archive:${OUT}/podman-machine" -o spdx-json="$OUT/sbom.spdx.json"
   jq -e '.spdxVersion' "$OUT/sbom.spdx.json" >/dev/null || die "SBOM inválida"
   pkgs=$(jq '[.packages[]?] | length' "$OUT/sbom.spdx.json")
   bytes=$(stat -c%s "$OUT/sbom.spdx.json")
   note "SBOM: $pkgs pacotes | $bytes bytes | sha256=$(sha256sum "$OUT/sbom.spdx.json" | cut -d' ' -f1)"
-  [ "$bytes" -le 16777216 ] || die "SBOM acima do teto de 16 MiB do gate: $bytes bytes"
+  # 16 MiB é trava rígida da action de atestação (MAX_SBOM_SIZE_BYTES em
+  # actions/attest/src/sbom.ts), aplicada antes de assinar. Falhar aqui, com o
+  # tamanho no log, é melhor que falhar lá com o build inteiro já feito.
+  [ "$bytes" -le 16777216 ] || die "SBOM acima do limite de 16 MiB da action de atestação: $bytes bytes"
   [ "$pkgs" -ge 400 ] || die "SBOM com pacotes de menos ($pkgs) — enumeração por componente incompleta"
 fi
 
