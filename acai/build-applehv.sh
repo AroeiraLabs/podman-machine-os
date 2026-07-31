@@ -63,12 +63,13 @@ podman build -t "$IMAGE_TAG" \
   --build-arg PODMAN_PR_NUM=""
 
 # Sanidade: a versão do podman dentro da imagem deve ser a do lock.
-# Imagem "golden": machine-id vazio. Populado, o systemd não reconhece primeiro
-# boot, não roda 'systemctl preset-all', e nada do que o Ignition pede fica
-# habilitado — o guest sobe mas nunca sinaliza prontidão.
-MID=$(podman run --rm --cgroups=disabled "$IMAGE_TAG" sh -c 'wc -c < /etc/machine-id' | tr -d ' ')
-[ "$MID" = "0" ] || die "machine-id da imagem não está vazio ($MID bytes) — o guest não completaria o start"
-note "machine-id da imagem: vazio (0 bytes)"
+# O machine-id tem de estar AUSENTE, não vazio: o systemd só reconhece primeiro
+# boot quando o arquivo não existe (ou contém 'uninitialized'). Um arquivo vazio
+# é lido como sistema já inicializado, o preset-all não roda, e nada do que o
+# Ignition pede fica habilitado — o guest sobe mas nunca sinaliza prontidão.
+MID=$(podman run --rm --cgroups=disabled "$IMAGE_TAG" sh -c 'test -e /etc/machine-id && echo PRESENTE || echo ausente')
+[ "$MID" = "ausente" ] || die "/etc/machine-id presente na imagem — o guest subiria mas nunca completaria o start"
+note "machine-id na imagem: ausente (correto)"
 
 GOT=$(podman run --rm --cgroups=disabled "$IMAGE_TAG" podman --version | awk '{print $3}')
 WANT=$(jq -r '.rpms[] | select(.name=="podman") | .nevra' "$LOCK" | sed -E 's/^podman-[0-9]+:([0-9.]+)-.*/\1/')
@@ -86,6 +87,20 @@ rpm-ostree compose build-chunked-oci \
 
 ls -la "$OUT" || true
 [ -f "$OUT/podman-machine" ] || die "oci-archive não é arquivo regular: $(ls -la "$OUT/podman-machine" 2>&1)"
+
+# Guarda sobre o ARTEFATO FINAL, não sobre a imagem intermediária: o rpm-ostree
+# tem 'machineid-compat' ligado por padrão e, nesse modo, recria
+# /usr/etc/machine-id vazio no commit — o que desfaria a correção sem deixar
+# rastro na imagem de onde ele partiu. Aqui se verifica o que de fato embarca.
+CHUNKED=$(podman load -i "$OUT/podman-machine" | tail -1)
+CHUNKED="${CHUNKED#Loaded image: }"
+[ -n "$CHUNKED" ] || die "não foi possível carregar o oci-archive para verificação"
+MID_FINAL=$(podman run --rm --cgroups=disabled "$CHUNKED" sh -c \
+  'if [ -e /usr/etc/machine-id ] || [ -e /etc/machine-id ]; then echo PRESENTE; else echo ausente; fi')
+[ "$MID_FINAL" = "ausente" ] \
+  || die "machine-id recriado no artefato final — o primeiro boot não seria reconhecido e o guest nunca ficaria pronto"
+note "machine-id no artefato final: ausente (correto)"
+podman rmi -f "$CHUNKED" >/dev/null 2>&1 || true
 
 # SBOM gerada AQUI, no mesmo passo em que o artefato nasce. Antes ela era gerada
 # num passo separado do workflow e dependia de o arquivo sobreviver entre passos,

@@ -28,8 +28,8 @@
       {
         "file": "acai/patches/0001-locked-build-common.patch",
         "applies_to": "podman-image/build_common.sh",
-        "sha256": "654a891a53b2a3f7226090646ad87668e84e8185afd563060e5b0ef7b6f869a1",
-        "purpose": "prende TODO dnf aos dois snapshots pinados; instala RPMs pre-verificados; exclui kernel* do upgrade (installonly: dois kernels quebram o boot); e ESVAZIA /etc/machine-id ao fim. Com machine-id populado o systemd nao reconhece primeiro boot, nao roda 'systemctl preset-all' e os presets do Ignition nunca viram symlink: nenhuma unidade habilitada, ready.service nao roda e 'podman machine start' espera para sempre (reproduzido no digest b24439b8). Guardas fail-closed: mais de um kernel, ou machine-id nao vazio, abortam o build"
+        "sha256": "be4cfe001eb52a72bddaa0a74467b0f21261f3f87f11011fa90cf237a1275d2d",
+        "purpose": "prende TODO dnf aos snapshots pinados; instala RPMs pre-verificados; exclui kernel* do upgrade (installonly: dois kernels quebram o boot); e REMOVE /etc/machine-id ao fim, condicao para o systemd reconhecer primeiro boot e aplicar os presets do Ignition. Guardas fail-closed: mais de um kernel, ou machine-id presente, abortam o build"
       },
       {
         "file": "acai/patches/0002-locked-containerfile.patch",
@@ -244,9 +244,10 @@
     "guard": "o build aborta se a imagem terminar com mais de um kernel"
   },
   "boot_policy": {
-    "machine_id": "deve ficar vazio na imagem; o build aborta se nao estiver",
-    "reason": "o systemd so aplica os presets gravados pelo Ignition quando detecta primeiro boot, o que depende de /etc/machine-id vazio. Populado, nenhuma unidade e habilitada — inclusive ready.service, que envia o sinal de prontidao ao host. Efeito colateral adicional: todas as VMs nasceriam com o mesmo machine-id.",
-    "evidence": "digest sha256:b24439b8... booto​u e ficou inacessivel ao 'podman machine start'; /usr/etc/machine-id da imagem tinha 33 bytes",
-    "upstream_note": "o upstream nao trata machine-id porque nao executa dnf upgrade; o scriptlet do systemd e que gera o arquivo"
+    "machine_id": "AUSENTE na imagem (nao vazio); o build aborta se existir, tanto na imagem quanto no artefato final",
+    "reason": "o systemd le /etc/machine-id para decidir primeiro boot (src/core/main.c): so a AUSENCIA do arquivo ou o conteudo literal 'uninitialized' resultam em first_boot=true; arquivo VAZIO e lido como sistema ja inicializado. Sem primeiro boot o PID 1 nao executa manager_preset_all(), e os presets que o Ignition grava em /etc/systemd/system-preset/20-ignition.preset nunca viram symlink — nenhuma unidade e habilitada, ready.service nao roda e o host espera para sempre pelo sinal de prontidao via vsock",
+    "upstream_reference": "o proprio Fedora CoreOS remove o arquivo (coreos-bootc-delta.yaml); a doc do systemd (BUILDING_IMAGES.md) manda remover ou gravar 'uninitialized'",
+    "evidence": "digest 6863c22c... tinha /etc/machine-id vazio: guest subiu, SSH e podman.socket ativos, mas as 5 unidades do Ignition ficaram disabled; 'systemctl preset-all' manual no guest habilitou tudo e o host destravou na hora",
+    "second_guard": "o rpm-ostree tem machineid-compat ligado por padrao e pode recriar /usr/etc/machine-id vazio no commit; por isso o artefato final tambem e inspecionado, e nao apenas a imagem intermediaria"
   }
 }

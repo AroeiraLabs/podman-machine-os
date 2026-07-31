@@ -107,12 +107,17 @@ def build_common(orig, repos, enabled):
         'dnf install -y "${PACKAGES[@]}"',
         f"dnf install -y --disablerepo='*' --enablerepo={enabled} \"${{PACKAGES[@]}}\"")
     out += (
-        '\n# Imagem "golden": o machine-id tem de ficar VAZIO. Com ele populado, o\n'
-        "# systemd nao reconhece primeiro boot e os presets que o Ignition grava\n"
-        "# nunca viram symlink: nenhuma unidade e habilitada e o guest nunca envia\n"
-        "# o sinal de prontidao.\n"
-        ": > /etc/machine-id\n"
-        'test ! -s /etc/machine-id || { echo "ACAI STOP: machine-id nao ficou vazio"; exit 42; }\n'
+        "\n# O /etc/machine-id tem de ficar AUSENTE, nao vazio. O systemd le esse\n"
+        "# arquivo para decidir se e primeiro boot (src/core/main.c): so a ausencia\n"
+        "# do arquivo ou o conteudo literal 'uninitialized' resultam em first_boot;\n"
+        "# um arquivo VAZIO e lido como sistema ja inicializado. Sem primeiro boot o\n"
+        "# PID 1 nao executa manager_preset_all(), e os presets que o Ignition grava\n"
+        "# em /etc/systemd/system-preset/20-ignition.preset nunca viram symlink:\n"
+        "# nenhuma unidade e habilitada, o ready.service nao roda e o host espera\n"
+        "# para sempre pelo sinal de prontidao. E a mesma razao pela qual o proprio\n"
+        "# Fedora CoreOS remove o arquivo em coreos-bootc-delta.yaml.\n"
+        "rm -vf /etc/machine-id\n"
+        'test ! -e /etc/machine-id || { echo "ACAI STOP: /etc/machine-id ainda existe"; exit 42; }\n'
     )
     return out
 
