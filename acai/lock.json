@@ -28,7 +28,7 @@
       {
         "file": "acai/patches/0001-locked-build-common.patch",
         "applies_to": "podman-image/build_common.sh",
-        "sha256": "37a4e7e66b08139279c6cd1e8fe1c974084b74efd1665b45cadc98d3348bf377",
+        "sha256": "654a891a53b2a3f7226090646ad87668e84e8185afd563060e5b0ef7b6f869a1",
         "purpose": "prende TODO dnf aos dois snapshots pinados; instala RPMs pre-verificados; exclui kernel* do upgrade (installonly: dois kernels quebram o boot); e ESVAZIA /etc/machine-id ao fim. Com machine-id populado o systemd nao reconhece primeiro boot, nao roda 'systemctl preset-all' e os presets do Ignition nunca viram symlink: nenhuma unidade habilitada, ready.service nao roda e 'podman machine start' espera para sempre (reproduzido no digest b24439b8). Guardas fail-closed: mais de um kernel, ou machine-id nao vazio, abortam o build"
       },
       {
