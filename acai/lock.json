@@ -28,13 +28,13 @@
       {
         "file": "acai/patches/0001-locked-build-common.patch",
         "applies_to": "podman-image/build_common.sh",
-        "sha256": "11c09b730f1e650700b47a77f706a62fe5a3dbe4a88d32feb5f557edf8d5b5ff",
+        "sha256": "37a4e7e66b08139279c6cd1e8fe1c974084b74efd1665b45cadc98d3348bf377",
         "purpose": "prende TODO dnf aos dois snapshots pinados; instala RPMs pre-verificados; exclui kernel* do upgrade (installonly: dois kernels quebram o boot); e ESVAZIA /etc/machine-id ao fim. Com machine-id populado o systemd nao reconhece primeiro boot, nao roda 'systemctl preset-all' e os presets do Ignition nunca viram symlink: nenhuma unidade habilitada, ready.service nao roda e 'podman machine start' espera para sempre (reproduzido no digest b24439b8). Guardas fail-closed: mais de um kernel, ou machine-id nao vazio, abortam o build"
       },
       {
         "file": "acai/patches/0002-locked-containerfile.patch",
         "applies_to": "podman-image/Containerfile.COREOS",
-        "sha256": "100394eec5bb8708d68c6003ce4e540896e4817a686d10521388a5b4ae0284df",
+        "sha256": "f56ef76c711cb207fe0e352d9d79a664ea26513364c27fffd7f626429de17f28",
         "purpose": "prende o dnf da primeira stage aos mesmos dois snapshots pinados e REMOVE a chamada 'ostree container commit' (verbo e extensao externa do pacote bootc, ausente nesta arvore; hoje so esvazia /run /tmp /var/tmp /var/cache e o upstream documentou como nao recomendado)"
       }
     ]
@@ -68,9 +68,9 @@
       {
         "repo_id": "acai-f44-updates-locked",
         "baseurl": "https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/aarch64/",
-        "repomd_sha256": "bd7c09a02adfa2c939e40c0c353baa8915f12918b0498ce3aa7afafbae429d56",
-        "revision": "1785371920",
-        "note": "snapshot de updates coletado em 2026-07-30. Repo MUTAVEL na origem: o pin do repomd o congela para este build e qualquer deriva e stop, exigindo re-coleta e nova revisao (D-010)"
+        "repomd_sha256": "3e3593d2a9f7b42f89e4b6b631b62abe1411c03014900ac0fba2cfe2629fa2ec",
+        "revision": "1785457389",
+        "note": "snapshot de updates re-coletado em 2026-07-31 apos deriva detectada pelo gate (o anterior, bd7c09a0..., revisao 1785371920, foi publicado em 30/07 e substituido no dia seguinte). Repo MUTAVEL na origem: o pin o congela para este build e qualquer deriva e stop, exigindo re-coleta e nova revisao"
       }
     ],
     "gpgcheck": true,
