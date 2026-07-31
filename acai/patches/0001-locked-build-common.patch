@@ -21,7 +21,7 @@
 +printf '%s\n' '[acai-f44-updates-locked]' 'name=acai-f44-updates-locked' 'baseurl=https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/aarch64/' 'enabled=1' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary' 'metadata_expire=never' > /etc/yum.repos.d/acai-f44-updates-locked.repo
 +dnf makecache --refresh
 +echo "ad124f8125666e9059d7a8180427bdaea80f6286f71140457e5c7edd95883eee  $(find /var/cache -path '*acai-f44-ga-locked*' -name repomd.xml | head -1)" | sha256sum -c -
-+echo "bd7c09a02adfa2c939e40c0c353baa8915f12918b0498ce3aa7afafbae429d56  $(find /var/cache -path '*acai-f44-updates-locked*' -name repomd.xml | head -1)" | sha256sum -c -
++echo "3e3593d2a9f7b42f89e4b6b631b62abe1411c03014900ac0fba2cfe2629fa2ec  $(find /var/cache -path '*acai-f44-updates-locked*' -name repomd.xml | head -1)" | sha256sum -c -
 +shopt -s nullglob
 +ACAI_RPMS=(/var/tmp/rpms/*.rpm)
 +if [[ ${#ACAI_RPMS[@]} -eq 0 ]]; then echo "ACAI STOP: nenhum RPM pre-verificado"; exit 42; fi
@@ -57,19 +57,14 @@
  
  # Remove unwanted packages (mainly relevant for coreos)
  dnf remove -y moby-engine containerd runc toolbox qed-firmware docker-cli
-@@ -147,3 +147,15 @@
+@@ -147,3 +147,10 @@
  systemctl enable rhsmcertd.service
  # Patching qemu backed binfmt configurations to use the actual executable's permissions and not the interpreter's
  for x in /usr/lib/binfmt.d/*.conf; do sed 's/\(:[^C:]*\)$/\1PC/' "$x" | tee /etc/binfmt.d/"$(basename "$x")"; done
 +
 +# Imagem "golden": o machine-id tem de ficar VAZIO. Com ele populado, o systemd
 +# nao reconhece primeiro boot, nao executa 'systemctl preset-all', e os presets
-+# que o Ignition grava (enable ready.service, podman.socket, rosetta-activation,
-+# immutable-root-*) nunca viram symlink: NENHUMA unidade e habilitada, o guest
++# que o Ignition grava nunca viram symlink: nenhuma unidade e habilitada, o guest
 +# nunca envia o sinal de prontidao e o 'podman machine start' espera para sempre.
-+# Reproduzido no digest b24439b8, cujo /usr/etc/machine-id tinha 33 bytes.
-+# Efeito colateral do arquivo populado: toda VM criada da imagem nasceria com o
-+# MESMO machine-id. O upstream nao trata isso porque nao roda dnf upgrade; nos
-+# rodamos, e o scriptlet do systemd gera o arquivo.
 +: > /etc/machine-id
 +test ! -s /etc/machine-id || { echo "ACAI STOP: machine-id nao ficou vazio"; exit 42; }
