@@ -86,6 +86,15 @@ jobs:
           syft version; grype version
           echo "::notice::disco antes do build:"; df -h /var/tmp /tmp 2>/dev/null | sed -n '1,5p'
 
+      - name: Patches em sincronia com o lock (fail-closed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # O lock é a única fonte dos snapshots. Se um re-pin atualizar o lock e
+          # esquecer de regenerar os patches — ou vice-versa — a divergência para
+          # aqui, em segundos, e não vinte minutos adiante no meio do build.
+          python3 acai/gen-patches.py --check
+
       - name: Verificação do source-lock (fail-closed)
         shell: bash
         run: bash acai/verify-lock.sh
