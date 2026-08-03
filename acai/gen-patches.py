@@ -17,6 +17,7 @@ Uso:
 
 O upstream é baixado por commit fixado no lock; nada aqui resolve versão.
 """
+import difflib
 import hashlib
 import json
 import os
@@ -157,19 +158,14 @@ def main():
             orig = open(orig_path).read()
             new = fn(orig, repos, enabled)
 
-            a_dir, b_dir = os.path.join(tmp, "a"), os.path.join(tmp, "b")
-            for d in (a_dir, b_dir):
-                os.makedirs(os.path.join(d, os.path.dirname(src_rel)), exist_ok=True)
-            open(os.path.join(a_dir, src_rel), "w").write(orig)
-            open(os.path.join(b_dir, src_rel), "w").write(new)
-            diff = subprocess.run(
-                ["diff", "-u", f"a/{src_rel}", f"b/{src_rel}"],
-                cwd=tmp, capture_output=True, text=True).stdout
-            # Cabecalhos sem timestamp, para o patch ser estavel entre execucoes.
-            lines = diff.splitlines(keepends=True)
-            lines[0] = f"--- a/{src_rel}\n"
-            lines[1] = f"+++ b/{src_rel}\n"
-            diff = "".join(lines)
+            # O diff e gerado em Python, nao pelo binario `diff` do sistema: as
+            # implementacoes BSD e GNU divergem no formato, e o patch precisa sair
+            # byte a byte identico onde quer que o gerador rode — senao a propria
+            # conferencia de sincronia falha ao mudar de plataforma.
+            diff = "".join(difflib.unified_diff(
+                orig.splitlines(keepends=True),
+                new.splitlines(keepends=True),
+                fromfile=f"a/{src_rel}", tofile=f"b/{src_rel}", n=3))
 
             out_path = os.path.join(ROOT, patch_rel)
             if CHECK_ONLY:
