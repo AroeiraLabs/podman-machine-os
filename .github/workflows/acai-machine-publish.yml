@@ -63,7 +63,7 @@ jobs:
           ACAIUPD
           dnf makecache --refresh
           echo "ad124f8125666e9059d7a8180427bdaea80f6286f71140457e5c7edd95883eee  $(find /var/cache -path '*acai-f44-ga-locked*' -name repomd.xml | head -1)" | sha256sum -c -
-          echo "3e3593d2a9f7b42f89e4b6b631b62abe1411c03014900ac0fba2cfe2629fa2ec  $(find /var/cache -path '*acai-f44-updates-locked*' -name repomd.xml | head -1)" | sha256sum -c -
+          echo "53f49643106058074b7c7bc0238d3a76ebc68bb504db031334c62c23ce8534a9  $(find /var/cache -path '*acai-f44-updates-locked*' -name repomd.xml | head -1)" | sha256sum -c -
           # Lista idêntica a toolchain_packages do acai/lock.json (revisada em PR)
           dnf install -y --disablerepo='*' --enablerepo=acai-f44-ga-locked,acai-f44-updates-locked \
             git curl podman buildah zstd osbuild osbuild-tools \
