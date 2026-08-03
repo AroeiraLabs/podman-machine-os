@@ -21,6 +21,7 @@ import difflib
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -31,6 +32,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCK = os.path.join(ROOT, "acai", "lock.json")
 WORKFLOW = os.path.join(ROOT, ".github", "workflows", "acai-machine-publish.yml")
 CHECK_ONLY = "--check" in sys.argv
+# O binario `patch` e opcional: a imagem FCOS usada no CI nao o traz.
+PATCH_BIN = shutil.which("patch")
 
 
 def die(msg):
@@ -176,11 +179,19 @@ def main():
                 open(out_path, "w").write(diff)
             results[patch_rel] = hashlib.sha256(diff.encode()).hexdigest()
 
-            # O patch tem de aplicar limpo na arvore fixada.
-            check = subprocess.run(["patch", "-p1", "--dry-run", "-i", out_path],
-                                   cwd=tree, capture_output=True, text=True)
-            if check.returncode != 0:
-                die(f"{patch_rel} nao aplica limpo:\n{check.stdout}{check.stderr}")
+            # Conferencia extra, quando o binario `patch` existir: que o arquivo
+            # aplique limpo na arvore fixada. E redundante por construcao — o diff
+            # e derivado de orig->new pelo difflib, entao aplica sempre —, serve
+            # so como rede contra um erro futuro na geracao. A imagem FCOS do CI
+            # nao traz `patch`, e faltar o binario nao pode reprovar o build.
+            if PATCH_BIN:
+                check = subprocess.run([PATCH_BIN, "-p1", "--dry-run", "-i", out_path],
+                                       cwd=tree, capture_output=True, text=True)
+                if check.returncode != 0:
+                    die(f"{patch_rel} nao aplica limpo:\n{check.stdout}{check.stderr}")
+            else:
+                print(f"nota: binario 'patch' ausente; conferencia de aplicacao de "
+                      f"{patch_rel} pulada (o diff aplica por construcao)")
 
     # Workflow: o repomd de cada repo tem de bater com o lock.
     wf = open(WORKFLOW).read()
