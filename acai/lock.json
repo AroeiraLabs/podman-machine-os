@@ -28,7 +28,7 @@
       {
         "file": "acai/patches/0001-locked-build-common.patch",
         "applies_to": "podman-image/build_common.sh",
-        "sha256": "20156036d1d44b36e1003981af3e7d55843c4e0a7a4df4f55b2b562f39aa7d4a",
+        "sha256": "36fc1376ae623a1afa75a0a7c5a2acf9736df67d42d9db8d263af4e1fcbd0e62",
         "purpose": "prende TODO dnf aos snapshots pinados; instala RPMs pre-verificados; exclui kernel* do upgrade (installonly: dois kernels quebram o boot); e REMOVE /etc/machine-id ao fim, condicao para o systemd reconhecer primeiro boot e aplicar os presets do Ignition. Guardas fail-closed: mais de um kernel, ou machine-id presente, abortam o build"
       },
       {
